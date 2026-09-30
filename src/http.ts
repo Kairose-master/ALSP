@@ -1,14 +1,18 @@
 import { DOCTOR, object, pack, unpack, type Prepared, type WireResponse } from './protocol.js';
 
+export const INTEROP_USER_AGENT = 'alsp-interop/001';
+
 /** No automatic retries, redirects, paid fetch wrappers, cookies or credentials. */
 export async function boundedFetch(url: string, init: RequestInit = {}, fetchImpl: typeof fetch = fetch): Promise<{ status: number; headers: Headers; body: unknown }> {
   const u = new URL(url);
   if (u.origin !== DOCTOR || !['/api/v1/preflight', '/.well-known/x402-doctor-signer.json'].includes(u.pathname) || u.username || u.password || u.hash) throw new Error('Unapproved upstream');
+  const headers = new Headers(init.headers);
+  if (!headers.has('user-agent')) headers.set('user-agent', INTEROP_USER_AGENT);
   const controller = new AbortController();
   let timeout: ReturnType<typeof setTimeout>;
   const deadline = new Promise<never>((_, reject) => { timeout = setTimeout(() => { controller.abort(); reject(new Error('HTTP timeout; payment outcome may be unknown')); }, 30000); });
   const task = (async () => {
-    const response = await fetchImpl(url, { ...init, redirect: 'manual', credentials: 'omit', signal: controller.signal });
+    const response = await fetchImpl(url, { ...init, headers, redirect: 'manual', credentials: 'omit', signal: controller.signal });
     if (response.status >= 300 && response.status < 400) throw new Error('Redirect refused');
     const reader = response.body?.getReader();
     const chunks: Uint8Array[] = []; let size = 0;

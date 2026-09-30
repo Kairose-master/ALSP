@@ -11,7 +11,8 @@ const { values, positionals } = parseArgs({ allowPositionals: true, strict: true
   output: { type: 'string', default: 'data/doctor-report.json' },
 } });
 const mode = positionals[0] ?? 'probe';
-const input = { url: `${DOCTOR}/demo/broken`, method: 'GET' };
+const INTEROP_TARGET = 'https://ichimoku-signal.fizzl.eu/signal/BTC-USDT';
+const input = { url: INTEROP_TARGET, method: 'GET' };
 let journal;
 async function save(report) {
   const path = resolve(values.output); await mkdir(resolve(path, '..'), { recursive: true, mode: 0o700 });
@@ -65,7 +66,7 @@ try {
         }
         id = journal.create(terms);
       }
-      console.log(JSON.stringify({ sessionId: id, maxTotalAtomic: cap.toString(), note: 'Save this sessionId for --session resume; never delete an unresolved journal.' }));
+      console.log(JSON.stringify({ sessionId: id, network: NETWORK, payer: signer.address, target: INTEROP_TARGET, userAgent: 'alsp-interop/001', maxTotalAtomic: cap.toString(), note: 'Save this sessionId for --session resume; never delete an unresolved journal.' }));
       const client = new SessionClient(journal, { ...transport, prepare: signer.prepare, verify });
       for (let i = 0; i < count; i++) {
         const call = await client.call(id, `preflight-${i + 1}`, input);
