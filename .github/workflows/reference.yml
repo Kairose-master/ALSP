@@ -1,0 +1,42 @@
+name: ALSP reference and Doctor compatibility
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  reference:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --ignore-scripts --no-audit --no-fund
+      - run: npm run typecheck
+      - run: npm test
+  doctor-unpaid:
+    needs: reference
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Validate real Doctor 402 and signer metadata, never pay
+        run: npm run doctor:probe
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: doctor-unpaid-${{ github.run_id }}
+          path: data/doctor-report.json
+          if-no-files-found: warn
+          retention-days: 7
