@@ -178,6 +178,21 @@ test('resume refuses unresolved, expired, exhausted or call-limit sessions', asy
     assert.throws(() => expired.journal.resume(expired.id, now + 600001));
   } finally { expired.journal.close(); }
 });
+test('fully verified call set can be ended after the final reconciliation without another paid run', async () => {
+  const f = fixture();
+  try {
+    await f.client.call(f.id, 'one', input);
+    await f.client.call(f.id, 'two', input);
+    const third = await f.client.call(f.id, 'three', input);
+    assert.equal(third.state, 'VERIFIED');
+    const calls = f.journal.calls(f.id);
+    assert.equal(calls.length, f.journal.session(f.id).terms.maxCalls);
+    assert.ok(calls.every(call => call.state === 'VERIFIED'));
+    f.journal.end(f.id);
+    assert.equal(f.journal.export(f.id).summary.state, 'CLOSED');
+    assert.equal(f.journal.export(f.id).summary.verifiedSpent, '3000');
+  } finally { f.journal.close(); }
+});
 test('lost response can be attached for verification, never by creating a new payment', async () => {
   const f = fixture(); f.adapters.send = async () => { throw new Error('lost response'); };
   try {
