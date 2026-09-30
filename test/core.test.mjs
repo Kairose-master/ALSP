@@ -134,6 +134,50 @@ test('RPC failure after capture can reconcile after restart without a signer or 
     assert.ok(verifyChain(b.export(id))); assert.equal(f.counts().sent, 1);
   } finally { b.close(); rmSync(dir, { recursive: true, force: true }); }
 });
+test('an early-ended session can resume only after reconciliation and continue within the original cap', async () => {
+  const f = fixture();
+  try {
+    const first = await f.client.call(f.id, 'one', input);
+    assert.equal(first.state, 'VERIFIED');
+    f.journal.end(f.id);
+    assert.equal(f.journal.export(f.id).summary.state, 'CLOSED');
+    f.journal.resume(f.id, now);
+    assert.equal(f.journal.session(f.id).state, 'ACTIVE');
+    const second = await f.client.call(f.id, 'two', input);
+    assert.equal(second.state, 'VERIFIED');
+    assert.equal(f.journal.calls(f.id).length, 2);
+    assert.equal(f.counts().sent, 2);
+  } finally { f.journal.close(); }
+});
+test('resume refuses unresolved, expired, exhausted or call-limit sessions', async () => {
+  const unresolved = fixture();
+  unresolved.adapters.send = async () => { throw new Error('lost'); };
+  try {
+    await unresolved.client.call(unresolved.id, 'one', input);
+    unresolved.journal.end(unresolved.id);
+    assert.throws(() => unresolved.journal.resume(unresolved.id, now));
+  } finally { unresolved.journal.close(); }
+
+  const full = fixture(terms({ maxTotal: '1000', maxCalls: 3 }));
+  try {
+    await full.client.call(full.id, 'one', input);
+    full.journal.end(full.id);
+    assert.throws(() => full.journal.resume(full.id, now));
+  } finally { full.journal.close(); }
+
+  const limited = fixture(terms({ maxCalls: 1 }));
+  try {
+    await limited.client.call(limited.id, 'one', input);
+    limited.journal.end(limited.id);
+    assert.throws(() => limited.journal.resume(limited.id, now));
+  } finally { limited.journal.close(); }
+
+  const expired = fixture();
+  try {
+    expired.journal.end(expired.id);
+    assert.throws(() => expired.journal.resume(expired.id, now + 600001));
+  } finally { expired.journal.close(); }
+});
 test('lost response can be attached for verification, never by creating a new payment', async () => {
   const f = fixture(); f.adapters.send = async () => { throw new Error('lost response'); };
   try {
