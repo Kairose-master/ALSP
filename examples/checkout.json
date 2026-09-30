@@ -1,0 +1,14 @@
+{
+  "protocol": "ALSP/0.1",
+  "session_id": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "terms_hash": "0xcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "prev_head_hash": "0xdddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "sequence": 12,
+  "usage_summary": {
+    "accepted_units": "11",
+    "meter_hash": "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+  },
+  "final_amount": "5500000",
+  "currency": "USDC",
+  "phase": "CHECKOUT"
+}
