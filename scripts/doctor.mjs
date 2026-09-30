@@ -43,8 +43,13 @@ try {
       const noPayments = async () => { throw new Error('Reconciliation cannot create/send a payment'); };
       const client = new SessionClient(journal, { probe: noPayments, prepare: noPayments, send: noPayments, verify });
       await client.reconcile(values['call-id'], values.evidence ? JSON.parse(await readFile(values.evidence, 'utf8')) : undefined);
+      const reconciled = journal.call(values['call-id']);
+      const session = journal.session(values.session);
+      const calls = journal.calls(values.session);
+      const allVerified = calls.length === session.terms.maxCalls && calls.every(call => call.state === 'VERIFIED');
+      if (reconciled.state === 'VERIFIED' && allVerified) journal.end(values.session);
       await save(journal.export(values.session));
-      if (journal.call(values['call-id']).state !== 'VERIFIED') process.exitCode = 2;
+      if (reconciled.state !== 'VERIFIED') process.exitCode = 2;
     } else {
       if (process.env.ALSP_ENABLE_MAINNET !== 'I_ACCEPT_EXACT_PER_CALL_SPEND' || !process.env.ALSP_PRIVATE_KEY || !values['max-total'] || !values['terms-file']) throw new Error('Paid mode requires explicit mainnet opt-in, private key, --max-total and --terms-file');
       const cap = atomic(values['max-total']), count = Number(values.calls);
