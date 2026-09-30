@@ -58,6 +58,7 @@ try {
       if (id) {
         const existing = journal.session(id).terms;
         if (address(existing.payer) !== address(signer.address) || existing.maxTotal !== terms.maxTotal || existing.maxCalls !== count || existing.license.sha256 !== terms.license.sha256) throw new Error('Resume policy differs from journal');
+        journal.resume(id);
       } else {
         const unfinished = journal.unfinishedForPayer(signer.address);
         if (unfinished.length) {
@@ -73,7 +74,9 @@ try {
         console.log(JSON.stringify({ callId: call.id, state: call.state }));
         if (call.state !== 'VERIFIED') { process.exitCode = 2; break; }
       }
-      journal.end(id);
+      const completed = journal.calls(id).filter(call => call.state === 'VERIFIED').length;
+      const unresolved = journal.calls(id).some(call => call.state !== 'VERIFIED');
+      if (!unresolved && completed >= count) journal.end(id);
       const report = journal.export(id);
       // A buyer signature seals this local observation, not provider assent.
       const manifest = { profile: PROFILE, sessionId: id, archiveSha256: digest(report), headHash: report.headHash };
