@@ -33,7 +33,7 @@ npm run doctor:paid -- --max-total 3000 --calls 3 --terms-file ./reviewed-terms.
 
 The cap is **3,000 atomic USDC = 0.003 USDC**. Every supported challenge must charge at most **1,000 units per call**. The first-runner hard limit is 10 calls and 10,000 units total. It makes no ERC-20 approval or registry transaction; the existing facilitator submits ordinary EIP-3009 transfers.
 
-The fixed input is Doctor's own intentionally broken demo endpoint, so a valid delivered response can legitimately be `no_go`. Each call is a separate service purchase, even if Doctor serves a cached diagnosis.
+The provider-coordinated fixed preflight target is `https://ichimoku-signal.fizzl.eu/signal/BTC-USDT`. Every Doctor request carries `User-Agent: alsp-interop/001` so the operator can correlate buyer and provider logs. Each call is a separate service purchase, even if Doctor serves a cached diagnosis.
 
 Save the printed session ID. The SQLite file contains sensitive signed authorizations and must remain local. Paid archives contain input/payment metadata; do not publish them without review.
 
@@ -56,6 +56,16 @@ If the original response was lost, request the original signed response and sett
 A valid signed response with delayed RPC visibility remains unresolved until an explicit reconcile succeeds. A payment without a recoverable valid response must **not** be labelled successful service delivery. This client intentionally has no automatic refund, release, cancel, or server-response recovery API.
 
 Exit codes: `0` completed operation; `2` unresolved call; `1` configuration/transport failure. Inspect the report rather than treating a probe's exit 0 as proof of a paid session.
+
+## Provider-side correlation contract
+
+Before spending, tell the Doctor operator:
+- network: Base mainnet (`eip155:8453`)
+- payer address from the dedicated trial wallet
+- User-Agent: `alsp-interop/001`
+- target: `https://ichimoku-signal.fizzl.eu/signal/BTC-USDT`
+
+After the trial, share only reviewed non-secret evidence for each call: UTC timestamp, verified settlement transaction hash, provider receipt/request ID, ALSP call ID, plus the ALSP session ID and final head hash. Never share the private key or bearer payment authorization/signature.
 
 ## What to send the Doctor operator
 
