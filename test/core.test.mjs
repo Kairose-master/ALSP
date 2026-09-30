@@ -54,6 +54,16 @@ test('unpaid transport validates 402 header and refuses conflicting mirrors', as
   await assert.rejects(bad.probe(`${DOCTOR}/api/v1/preflight`));
   await assert.rejects(doctorTransport(async () => new Response('{}', { status: 200 })).probe(`${DOCTOR}/api/v1/preflight`));
 });
+test('Doctor transport sends stable Interop #001 User-Agent on probes', async () => {
+  const c = challenge();
+  let seen;
+  const transport = doctorTransport(async (_url, init) => {
+    seen = new Headers(init?.headers).get('user-agent');
+    return new Response(JSON.stringify(c), { status: 402, headers: { 'payment-required': pack(c) } });
+  });
+  await transport.probe(`${DOCTOR}/api/v1/preflight`);
+  assert.equal(seen, 'alsp-interop/001');
+});
 test('network guard rejects other hosts, routes, redirects and oversized bodies', async () => {
   let n = 0; const fetcher = async () => { n++; return new Response('{}'); };
   await assert.rejects(boundedFetch('https://evil.example', {}, fetcher));
