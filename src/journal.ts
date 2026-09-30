@@ -137,6 +137,18 @@ export class Journal {
       this.append(c.sessionId, { kind: 'verified', callId: id, amount: c.amount, proof });
     });
   }
+  resume(sessionId: string, now = Date.now()): void {
+    this.transaction(() => {
+      const s = this.session(sessionId), calls = this.calls(sessionId);
+      if (s.state === 'ACTIVE') return;
+      if (now >= s.terms.expiresAt) throw new Error('Session expired');
+      if (calls.some(c => c.state !== 'VERIFIED')) throw new Error('Unresolved call prevents resume');
+      if (calls.length >= s.terms.maxCalls) throw new Error('Session call limit reached');
+      if (calls.reduce((sum, c) => sum + atomic(c.amount), 0n) >= atomic(s.terms.maxTotal)) throw new Error('Session budget exhausted');
+      this.db.prepare('UPDATE sessions SET state=? WHERE id=?').run('ACTIVE', sessionId);
+      this.append(sessionId, { kind: 'access_resumed', reason: 'continue_after_reconciliation' });
+    });
+  }
   end(sessionId: string): void {
     this.transaction(() => {
       const s = this.session(sessionId);
