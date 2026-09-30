@@ -39,7 +39,7 @@ Save the printed session ID. The SQLite file contains sensitive signed authoriza
 
 ## 3. Resume / reconcile safely
 
-The CLI stops immediately at the first unresolved call. **Do not start a new session to retry it.** A crash before `end` can resume with the same journal, session ID, cap, call count and terms file:
+The CLI stops immediately at the first unresolved call. **Do not start a new session to retry it.** A crash before `end`, or an early close from the original v0.2 runner after a successfully reconciled call, can resume with the same journal, session ID, cap, call count and terms file. Resume re-opens only when every existing call is VERIFIED, the original session has not expired, and both call-count and budget capacity remain:
 
 ```bash
 npm run doctor:paid -- --session SESSION_ID --max-total 3000 --calls 3 --terms-file ./reviewed-terms.txt
