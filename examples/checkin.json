@@ -1,0 +1,18 @@
+{
+  "protocol": "ALSP/0.1",
+  "session_id": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "resource_id": "research-api:semiconductor-pricing",
+  "resource_version": "2026-09-30",
+  "provider": "0x1111111111111111111111111111111111111111",
+  "buyer": "0x2222222222222222222222222222222222222222",
+  "license_policy_hash": "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "pricing": {
+    "checkin_fee": "1000000",
+    "unit": "query",
+    "unit_price": "500000",
+    "currency": "USDC",
+    "max_checkout_liability": "10000000"
+  },
+  "access_expiry": 1790812800,
+  "settlement_due": 1790899200
+}
