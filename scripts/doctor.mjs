@@ -57,7 +57,14 @@ try {
       if (id) {
         const existing = journal.session(id).terms;
         if (address(existing.payer) !== address(signer.address) || existing.maxTotal !== terms.maxTotal || existing.maxCalls !== count || existing.license.sha256 !== terms.license.sha256) throw new Error('Resume policy differs from journal');
-      } else { id = journal.create(terms); }
+      } else {
+        const unfinished = journal.unfinishedForPayer(signer.address);
+        if (unfinished.length) {
+          console.error(JSON.stringify({ resumeRequired: unfinished }));
+          throw new Error('Existing journal session requires resume/reconciliation');
+        }
+        id = journal.create(terms);
+      }
       console.log(JSON.stringify({ sessionId: id, maxTotalAtomic: cap.toString(), note: 'Save this sessionId for --session resume; never delete an unresolved journal.' }));
       const client = new SessionClient(journal, { ...transport, prepare: signer.prepare, verify });
       for (let i = 0; i < count; i++) {

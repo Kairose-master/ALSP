@@ -47,6 +47,12 @@ export class Journal {
     this.db.prepare('INSERT INTO sessions VALUES(?,?,?,?,?)').run(id, canonical(terms), 'ACTIVE', digest({ profile: PROFILE, sessionId: id, terms }), 0);
     return id;
   }
+  unfinishedForPayer(payer: string): string[] {
+    return this.db.prepare('SELECT id FROM sessions').all().map(row => String(row.id)).filter(id => {
+      const s = this.session(id);
+      return s.terms.payer.toLowerCase() === payer.toLowerCase() && (s.state === 'ACTIVE' || this.calls(id).some(c => c.state !== 'VERIFIED'));
+    });
+  }
   private append(sessionId: string, event: unknown): void {
     const s = this.session(sessionId), seq = s.seq + 1;
     const head = digest({ profile: PROFILE, sessionId, seq, previous: s.head, event });

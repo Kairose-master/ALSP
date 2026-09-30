@@ -23,7 +23,10 @@ export async function verifyDoctorReceipt(call: Call, terms: Terms, pins: Signer
   const unsigned = { ...r }; delete unsigned.signature;
   const signer = address(await recoverMessageAddress({ message: canonical({ ...body, receipt: unsigned }), signature: signature as `0x${string}` }));
   if (signer !== address(r.signer)) throw new Error('Receipt signature mismatch');
-  const pinned = pins.some(pin => address(pin.address) === signer && (!pin.validFrom || signedAt >= Date.parse(pin.validFrom)) && (!pin.validUntil || signedAt < Date.parse(pin.validUntil)));
+  const matchingPins = pins.filter(pin => address(pin.address) === signer);
+  const pinned = matchingPins.some(pin => (!pin.validFrom || signedAt >= Date.parse(pin.validFrom)) && (!pin.validUntil || signedAt < Date.parse(pin.validUntil)));
+  // A certificate must not override an explicit validity restriction on this key.
+  if (matchingPins.length && !pinned) throw new Error('Pinned signer outside validity window');
   if (!pinned) {
     // A rotated key must be certified by the separately pinned payout authority.
     const cert = object(r.cert);
