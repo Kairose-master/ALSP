@@ -2,7 +2,9 @@ import { DatabaseSync } from 'node:sqlite';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { chmodSync, closeSync, constants, existsSync, lstatSync, mkdirSync, openSync } from 'node:fs';
 import { dirname } from 'node:path';
-import { atomic, canonical, digest, inputOf, PROFILE, validateTerms, type Prepared, type Quote, type RequestInput, type Terms, type Verified, type WireResponse } from './protocol.js';
+import { atomic, canonical, digest, inputOf, PROFILE, GENERIC_PROFILE, normalizeTerms, validateTerms, type GenericTerms, type Prepared, type Quote, type RequestInput, type Terms, type Verified, type WireResponse } from './protocol.js';
+import { transitionCall, transitionSession, type CallState, type SessionState } from './state-machine.js';
+import { verifyProviderAgreement, type BilateralSessionAgreement } from './agreement.js';
 
 export interface Call {
   id: string; sessionId: string; requestKey: string; requestHash: string;
@@ -10,20 +12,11 @@ export interface Call {
   state: 'RESERVED' | 'AUTHORIZED' | 'SUBMITTED' | 'RECONCILIATION_REQUIRED' | 'VERIFIED';
   prepared: Prepared | null; wire: WireResponse | null; verified: Verified | null;
 }
-export type CallState = Call['state'];
-export const CALL_TRANSITIONS: Readonly<Record<CallState, readonly CallState[]>> = {
-  RESERVED: ['AUTHORIZED', 'RECONCILIATION_REQUIRED'], AUTHORIZED: ['SUBMITTED', 'RECONCILIATION_REQUIRED'],
-  SUBMITTED: ['RECONCILIATION_REQUIRED', 'VERIFIED'], RECONCILIATION_REQUIRED: ['VERIFIED'], VERIFIED: [],
-};
 export function assertCallTransition(from: CallState, to: CallState): void {
-  if (!CALL_TRANSITIONS[from].includes(to)) throw new Error(`Forbidden call transition: ${from} -> ${to}`);
+  transitionCall(from, to);
 }
-export type SessionState = 'ACTIVE' | 'RECONCILIATION_REQUIRED' | 'CLOSED';
-export const SESSION_TRANSITIONS: Readonly<Record<SessionState, readonly SessionState[]>> = {
-  ACTIVE: ['RECONCILIATION_REQUIRED', 'CLOSED'], RECONCILIATION_REQUIRED: ['ACTIVE', 'CLOSED'], CLOSED: [],
-};
 export function assertSessionTransition(from: SessionState, to: SessionState): void {
-  if (!SESSION_TRANSITIONS[from].includes(to)) throw new Error(`Forbidden session transition: ${from} -> ${to}`);
+  transitionSession(from, to);
 }
 export interface EventRow { seq: number; previous: string; head: string; event: unknown; }
 export class Journal {
@@ -43,6 +36,9 @@ export class Journal {
       CREATE TABLE IF NOT EXISTS payments(id TEXT PRIMARY KEY, call_id TEXT NOT NULL UNIQUE REFERENCES calls(id));
       CREATE TABLE IF NOT EXISTS receipts(id TEXT PRIMARY KEY, call_id TEXT NOT NULL UNIQUE REFERENCES calls(id));
       CREATE TABLE IF NOT EXISTS events(session_id TEXT NOT NULL REFERENCES sessions(id), seq INTEGER NOT NULL, previous TEXT NOT NULL, head TEXT NOT NULL, event TEXT NOT NULL, PRIMARY KEY(session_id,seq));`);
+    const cols = this.db.prepare('PRAGMA table_info(sessions)').all().map(r => String(r.name));
+    if (!cols.includes('mode')) this.db.exec("ALTER TABLE sessions ADD COLUMN mode TEXT NOT NULL DEFAULT 'compatibility'");
+    if (!cols.includes('agreement')) this.db.exec('ALTER TABLE sessions ADD COLUMN agreement TEXT');
   }
   close(): void { this.db.close(); }
   private transaction<T>(fn: () => T): T {
@@ -50,24 +46,57 @@ export class Journal {
     try { const result = fn(); this.db.exec('COMMIT'); return result; }
     catch (e) { this.db.exec('ROLLBACK'); throw e; }
   }
-  session(id: string): { terms: Terms; state: string; head: string; seq: number } {
+  session(id: string): { terms: Terms; state: string; head: string; seq: number; mode: 'compatibility' | 'bilateral'; agreement: BilateralSessionAgreement | null } {
     const row = this.db.prepare('SELECT * FROM sessions WHERE id=?').get(id);
     if (!row) throw new Error('Unknown session');
     const stored = String(row.state);
     const legacyEndedState = stored === 'ENDED' ? (this.calls(id).every(c => c.state === 'VERIFIED') ? 'CLOSED' : 'RECONCILIATION_REQUIRED') : stored;
-    return { terms: JSON.parse(String(row.terms)) as Terms, state: legacyEndedState, head: String(row.head), seq: Number(row.seq) };
+    return { terms: JSON.parse(String(row.terms)) as Terms, state: legacyEndedState, head: String(row.head), seq: Number(row.seq), mode: (String(row.mode ?? 'compatibility') as 'compatibility' | 'bilateral'), agreement: row.agreement ? JSON.parse(String(row.agreement)) as BilateralSessionAgreement : null };
   }
   create(terms: Terms, now = Date.now()): string {
+    if (terms.profile === GENERIC_PROFILE) throw new Error('Generic v0.3 sessions require createBilateral');
     validateTerms(terms);
     if (terms.expiresAt <= now) throw new Error('Session already expired');
     const id = randomUUID();
-    this.db.prepare('INSERT INTO sessions VALUES(?,?,?,?,?)').run(id, canonical(terms), 'ACTIVE', digest({ profile: PROFILE, sessionId: id, terms }), 0);
+    this.db.prepare("INSERT INTO sessions(id,terms,state,head,seq,mode,agreement) VALUES(?,?,?,?,?,'compatibility',NULL)").run(id, canonical(terms), 'ACTIVE', digest({ profile: PROFILE, sessionId: id, terms }), 0);
     return id;
+  }
+  /** Start a v0.3 bilateral lifecycle. Calls are disabled until a valid provider agreement is recorded. */
+  createBilateral(input: GenericTerms, now = Date.now()): string {
+    const terms = normalizeTerms(input);
+    validateTerms(terms);
+    if (terms.expiresAt <= now) throw new Error('Session already expired');
+    const id = randomUUID(), head = digest({ profile: PROFILE, sessionId: id, terms });
+    this.db.prepare("INSERT INTO sessions(id,terms,state,head,seq,mode,agreement) VALUES(?,?,?,?,?,?,NULL)").run(id, canonical(terms), 'PROPOSED', head, 0, 'bilateral');
+    return id;
+  }
+  async agree(sessionId: string, agreement: BilateralSessionAgreement): Promise<void> {
+    const s = this.session(sessionId);
+    if (s.mode !== 'bilateral' || s.state !== 'PROPOSED') throw new Error('Session is not awaiting bilateral agreement');
+    if (Date.now() >= s.terms.expiresAt) throw new Error('Session already expired');
+    if (!(await verifyProviderAgreement(agreement, s.terms, sessionId))) throw new Error('Invalid provider agreement');
+    this.transaction(() => {
+      const current = this.session(sessionId);
+      if (current.state !== 'PROPOSED' || current.agreement) throw new Error('Session agreement already recorded');
+      transitionSession('PROPOSED', 'AGREED');
+      this.db.prepare('UPDATE sessions SET state=?,agreement=? WHERE id=?').run('AGREED', canonical(agreement), sessionId);
+      this.append(sessionId, { kind: 'bilateral_agreement', agreement, agreementHash: digest(agreement), termsHash: digest(current.terms), provider: agreement.provider });
+    });
+  }
+  activate(sessionId: string, now = Date.now()): void {
+    this.transaction(() => {
+      const s = this.session(sessionId);
+      if (s.mode !== 'bilateral' || s.state !== 'AGREED' || !s.agreement) throw new Error('Verified bilateral agreement required');
+      if (now >= s.terms.expiresAt) throw new Error('Session already expired');
+      transitionSession('AGREED', 'ACTIVE');
+      this.db.prepare('UPDATE sessions SET state=? WHERE id=?').run('ACTIVE', sessionId);
+      this.append(sessionId, { kind: 'session_activated', agreementHash: digest(s.agreement) });
+    });
   }
   unfinishedForPayer(payer: string): string[] {
     return this.db.prepare('SELECT id FROM sessions').all().map(row => String(row.id)).filter(id => {
       const s = this.session(id);
-      return s.terms.payer.toLowerCase() === payer.toLowerCase() && (s.state === 'ACTIVE' || this.calls(id).some(c => c.state !== 'VERIFIED'));
+      return s.terms.payer.toLowerCase() === payer.toLowerCase() && (['PROPOSED', 'AGREED', 'ACTIVE', 'RECONCILIATION_REQUIRED'].includes(s.state) || this.calls(id).some(c => c.state !== 'VERIFIED'));
     });
   }
   private append(sessionId: string, event: unknown): void {
@@ -99,7 +128,7 @@ export class Journal {
       const old = this.find(sessionId, key, input);
       if (old) return { call: old, created: false };
       const s = this.session(sessionId), calls = this.calls(sessionId), amount = atomic(quote.accepted.amount);
-      if (s.state !== 'ACTIVE' || now >= s.terms.expiresAt) throw new Error('Session not active');
+      if (s.state !== 'ACTIVE' || (s.mode === 'bilateral' && !s.agreement) || now >= s.terms.expiresAt) throw new Error('Session not active');
       if (amount <= 0n || amount > atomic(s.terms.maxPerCall) || calls.length >= s.terms.maxCalls) throw new Error('Per-call policy exceeded');
       // Include every unresolved reservation: a network error never frees funds.
       if (calls.reduce((sum, c) => sum + atomic(c.amount), 0n) + amount > atomic(s.terms.maxTotal)) throw new Error('Session budget exceeded');
@@ -189,7 +218,7 @@ export class Journal {
   export(sessionId: string) {
     const s = this.session(sessionId), calls = this.calls(sessionId);
     const events: EventRow[] = this.db.prepare('SELECT * FROM events WHERE session_id=? ORDER BY seq').all(sessionId).map(r => ({ seq: Number(r.seq), previous: String(r.previous), head: String(r.head), event: JSON.parse(String(r.event)) as unknown }));
-    return { profile: PROFILE, sessionId, terms: s.terms, termsHash: digest(s.terms), headHash: s.head, events,
+    return { profile: PROFILE, sessionId, terms: s.terms, termsHash: digest(s.terms), mode: s.mode, agreement: s.agreement, headHash: s.head, events,
       summary: { state: s.state, allocatedTotal: calls.reduce((sum, c) => sum + atomic(c.amount), 0n).toString(), verifiedSpent: calls.filter(c => c.state === 'VERIFIED').reduce((sum, c) => sum + atomic(c.amount), 0n).toString(), unresolved: calls.filter(c => c.state !== 'VERIFIED').length, calls: calls.length, registryWrites: 0, settlementMode: 'exact-per-call', licenseAcceptance: 'buyer-only' },
       evidence: calls.map(c => ({ callId: c.id, input: c.input, quote: c.quote, nonce: c.nonce, wire: c.wire, verified: c.verified })) };
   }
@@ -197,6 +226,11 @@ export class Journal {
 export function verifyChain(archive: ReturnType<Journal['export']>): boolean {
   try {
     if (archive.profile !== PROFILE || archive.termsHash !== digest(archive.terms)) return false;
+    const storedAgreement = archive.agreement ?? null;
+    if (storedAgreement && !archive.events.some(r => {
+      const e = r.event as { kind?: string; agreement?: unknown; agreementHash?: string };
+      return e?.kind === 'bilateral_agreement' && digest(e.agreement) === digest(storedAgreement) && e.agreementHash === digest(storedAgreement);
+    })) return false;
     let head = digest({ profile: PROFILE, sessionId: archive.sessionId, terms: archive.terms });
     for (const [i, r] of archive.events.entries()) {
       if (r.seq !== i + 1 || r.previous !== head) return false;

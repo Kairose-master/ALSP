@@ -1,6 +1,6 @@
 # ALSP Reference v0.3
 
-This reference extends Interop #001 without changing its persisted profile identifier (`alsp-exact-session-v0.2`), exact-per-call payment shape, journal event-chain encoding, or Doctor EIP-191 receipt verifier. New implementations should use the generic adapter interfaces below. Existing v0.2 archives remain readable and retain their original buyer-only acceptance meaning.
+This reference extends Interop #001 without changing the frozen archive profile identifier (`alsp-exact-session-v0.2`), event-chain encoding, or Doctor EIP-191 receipt verifier. `GenericTerms` uses `ProviderProfile` and `PaymentProfile` as separate provider-neutral inputs; normalization validates their binding before storing the terms hash. Doctor-specific values remain compatibility constants for the v0.2 transport, receipt, and Base settlement implementations. Existing v0.2 archives remain readable and retain their original buyer-only acceptance meaning.
 
 ## Wire model
 
@@ -33,7 +33,7 @@ The reference `Quote` is the accepted x402 offer commitment: `{x402Version, reso
 }
 ```
 
-Verification binds signer to the terms provider, session ID, terms hash, endpoint scope, call cap, expiry, and exact pricing limits. Legacy `Terms.license.acceptance: "buyer-only"` remains separate: it records buyer-side terms and must not be represented as provider assent. The current agreement helper validates a signature but does not yet persist an agreement as part of journal creation or require it for the legacy Interop #001 path.
+Verification binds signer to the terms provider, session ID, terms hash, endpoint scope, call cap, expiry, and exact pricing limits. `Journal.createBilateral(GenericTerms)` starts in `PROPOSED`; `agree()` verifies and stores the complete signed agreement and includes it in the hash-chain event; only `activate()` makes it `ACTIVE`. Call reservation rejects every state except ACTIVE. `Journal.create()` accepts only the legacy terms profile and is the Interop #001 compatibility path. Legacy `Terms.license.acceptance: "buyer-only"` remains buyer-side acceptance and is not provider assent.
 
 ## Adapter architecture
 
@@ -41,7 +41,7 @@ Verification binds signer to the terms provider, session ID, terms hash, endpoin
 - `PaymentAdapter`: preparation and validation of a payment plus declared capabilities. The only enabled capability is `exact-per-call`.
 - `ReceiptEvidenceAdapter`: combines provider receipt and settlement verification into normalized evidence.
 - `ProviderReceiptVerifier`: provider receipt-specific evidence boundary. `DoctorEip191ReceiptAdapter` preserves the existing Doctor receipt verifier.
-- `X402OfferReceiptAdapter`: composes an x402 v2 offer/receipt envelope and checks response-to-offer binding. Chain settlement still requires an independent settlement verifier.
+- `X402OfferReceiptEnvelopeValidator`: checks x402 v2 offer/receipt envelope and payment-field bindings. It does not validate signature provenance or delivery; chain settlement still requires an independent settlement verifier. `X402OfferReceiptAdapter` is a deprecated compatibility alias.
 
 `upto` and `batch` are named capability boundaries only. Capability selection fails closed unless an implementation declares it, and the reference rejects both even if declared. They are not implemented or tested as payment modes.
 
@@ -63,6 +63,8 @@ Illegal transitions throw. An unresolved call moves the session to `RECONCILIATI
 
 | Current | Allowed next state | Condition |
 | --- | --- | --- |
+| `PROPOSED` | `AGREED` | Provider signature verified and full agreement durably recorded |
+| `AGREED` | `ACTIVE`, `CLOSED` | Explicit activation, or session abandoned |
 | `ACTIVE` | `RECONCILIATION_REQUIRED` | Any call becomes uncertain, or end requested with unresolved calls |
 | `ACTIVE` | `CLOSED` | End requested and every call is verified |
 | `RECONCILIATION_REQUIRED` | `ACTIVE` | All calls verified; resume policy permits more calls |
@@ -78,7 +80,7 @@ Older stored `ENDED` sessions are read as `CLOSED` when all calls were verified 
 - Provider and receipt adapters are trust boundaries; implementations must bind offer, response, payer, payee, asset, amount, and settlement evidence before returning `VERIFIED`.
 - Receipt provenance does not prove semantic correctness. RPC-confirmed events do not constitute trustless finality. A buyer seal proves local archive integrity, not provider assent or journal completeness.
 - Journal files contain bearer payment authorizations and require restrictive local permissions. This is not a hosted wallet or multi-tenant service.
-- The bilateral agreement model is currently a verification helper; no provider discovery, agreement negotiation, escrow, or automatic provider signature exchange exists.
+- Agreement signing and exchange remain out-of-band; no provider discovery, escrow, or automatic provider signature exchange exists. Signature validity establishes provider assent to these terms, not service correctness.
 - `upto`, funded sessions, batch settlement, refund/cancel paths, cross-chain payments, and registry anchoring are non-goals for this release. Unsupported payment modes are rejected.
 
 ## Community implementation reports (non-normative)
@@ -86,7 +88,7 @@ Older stored `ENDED` sessions are read as `CLOSED` when all calls were verified 
 Two Reddit implementation reports informed the boundaries above:
 
 - [An x402 builder's postmortem on payment intent IDs, pre-side-effect intent records, reconciliation, and cross-merchant budget accounting](https://www.reddit.com/r/x402/comments/1uzm02s/i_posted_my_agent_payment_infrastructure_here_a/). ALSP already persists a local reservation and submission intent before the paid send, never frees an uncertain reservation, and requires reconciliation. Its ledger is still local to one journal; it cannot establish a buyer's spend across unrelated sessions, devices, or merchants.
-- [A discussion of x402 safety tooling and seller-signed delivery receipts](https://www.reddit.com/r/BASE/comments/1uej6gh/x402_on_base_feels_like_a_big_unlock_for_ai/). The suggested receipt binds settlement, an idempotency key, and a response hash. The `X402OfferReceiptAdapter` here only checks an offer/receipt envelope and payment fields; it does not verify such a provider signature or prove delivery. Do not treat that helper alone as proof of service quality or provider-signed delivery.
+- [A discussion of x402 safety tooling and seller-signed delivery receipts](https://www.reddit.com/r/BASE/comments/1uej6gh/x402_on_base_feels_like_a_big_unlock_for_ai/). The suggested receipt binds settlement, an idempotency key, and a response hash. The `X402OfferReceiptEnvelopeValidator` here only checks an offer/receipt envelope and payment fields; it does not verify a provider signature or prove delivery.
 - [A report on x402 composition failures around replay protection, holds, and post-settlement crashes](https://www.reddit.com/r/x402/comments/1uxo0ia/i_built_payment_infrastructure_for_ai_agents_to/). It reinforces the no-automatic-resend and reconciliation rules, but does not establish a protocol standard.
 
 These are field reports and community opinions, not normative protocol specifications. They motivate future tests for provider-issued idempotency/delivery evidence, recovery from independent settlement records, and buyer-side budget enforcement across multiple providers. The current synthetic Interop #002 test demonstrates adapter decoupling only; it is not a live provider interoperability result.

@@ -1,6 +1,8 @@
 import { createHash } from 'node:crypto';
 
 export const PROFILE = 'alsp-exact-session-v0.2'; // frozen wire/profile identifier for Interop #001 archives
+export const GENERIC_PROFILE = 'alsp-exact-session-v0.3';
+/** Legacy Doctor/Base constants retained for the frozen v0.2 compatibility adapter. */
 export const DOCTOR = 'https://x402-doctor.fizzl.eu';
 export const ROUTE = 'GET /api/v1/preflight';
 export const NETWORK = 'eip155:8453';
@@ -55,10 +57,10 @@ export function unpack(header: string | null): unknown {
 }
 export const pack = (value: unknown): string => Buffer.from(canonical(value)).toString('base64');
 export interface Terms {
-  profile: typeof PROFILE;
+  profile: typeof PROFILE | typeof GENERIC_PROFILE;
   payer: string;
   provider: string;
-  network: typeof NETWORK;
+  network: string;
   asset: string;
   endpoint: string;
   maxTotal: string;
@@ -66,11 +68,45 @@ export interface Terms {
   maxCalls: number;
   expiresAt: number;
   license: { uri: string; sha256: string; acceptance: 'buyer-only' };
+  providerProfile?: ProviderProfile;
+  paymentProfile?: PaymentProfile;
+}
+/** Provider identity and endpoint are independent of any payment rail. */
+export interface ProviderProfile { id: string; address: string; endpoint: string; }
+/** Exact payment constraints are independent of provider transport and business identity. */
+export interface PaymentProfile { id: string; scheme: 'exact-per-call'; network: string; asset: string; payTo: string; }
+/** Public v0.3 terms shape. The journal stores its validated normalized projection for runtime compatibility. */
+export interface GenericTerms {
+  profile: typeof GENERIC_PROFILE;
+  payer: string;
+  providerProfile: ProviderProfile;
+  paymentProfile: PaymentProfile;
+  maxTotal: string;
+  maxPerCall: string;
+  maxCalls: number;
+  expiresAt: number;
+  license: Terms['license'];
+}
+export function normalizeTerms(t: GenericTerms): Terms {
+  if (t.profile !== GENERIC_PROFILE || t.paymentProfile.scheme !== 'exact-per-call') throw new Error('Unsupported generic terms profile');
+  if (!text(t.providerProfile.id) || !text(t.paymentProfile.id)) throw new Error('Profile identifiers required');
+  if (address(t.providerProfile.address) !== address(t.paymentProfile.payTo)) throw new Error('Provider payee must match provider identity');
+  return { profile: t.profile, payer: t.payer, provider: t.providerProfile.address, endpoint: t.providerProfile.endpoint,
+    network: t.paymentProfile.network, asset: t.paymentProfile.asset, maxTotal: t.maxTotal, maxPerCall: t.maxPerCall,
+    maxCalls: t.maxCalls, expiresAt: t.expiresAt, license: t.license,
+    providerProfile: t.providerProfile, paymentProfile: t.paymentProfile };
 }
 export function validateTerms(t: Terms): void {
-  if (t.profile !== PROFILE) throw new Error('Unsupported payment profile');
+  if (t.profile !== PROFILE && t.profile !== GENERIC_PROFILE) throw new Error('Unsupported payment profile');
   address(t.payer);
   address(t.provider); text(t.network); address(t.asset);
+  if (t.profile === GENERIC_PROFILE) {
+    if (!t.providerProfile || !t.paymentProfile || address(t.providerProfile.address) !== address(t.provider)
+      || t.providerProfile.endpoint !== t.endpoint || t.paymentProfile.network !== t.network
+      || address(t.paymentProfile.asset) !== address(t.asset) || address(t.paymentProfile.payTo) !== address(t.provider)
+      || t.paymentProfile.scheme !== 'exact-per-call') throw new Error('Generic provider/payment profile mismatch');
+    text(t.providerProfile.id); text(t.paymentProfile.id);
+  }
   const endpoint = new URL(text(t.endpoint));
   if (endpoint.protocol !== 'https:' || endpoint.username || endpoint.password || endpoint.hash) throw new Error('Invalid provider endpoint');
   if (atomic(t.maxTotal) <= 0n || atomic(t.maxPerCall) <= 0n || atomic(t.maxPerCall) > atomic(t.maxTotal)) throw new Error('Invalid budget');
@@ -123,7 +159,7 @@ export function selectQuote(challenge: unknown, terms: Terms, input: RequestInpu
   }
   options.sort((a, b) => atomic(a.amount) < atomic(b.amount) ? -1 : atomic(a.amount) > atomic(b.amount) ? 1 : 0);
   const accepted = options[0];
-  if (!accepted) throw new Error('No supported exact Base USDC option within policy');
+  if (!accepted) throw new Error('No supported exact-per-call option within policy');
   return { x402Version: 2, resource: r, accepted };
 }
 export interface Prepared {

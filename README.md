@@ -47,7 +47,7 @@ A timeout, invalid signature, missing settlement, RPC error or restart cannot si
 
 The SQLite journal is sensitive: it temporarily contains bearer payment authorizations, is opened with mode `0600`, and uses WAL / `synchronous=FULL` and transactional reservations. This is a single-machine research client, **not a multi-tenant wallet service**. Keep SQLite and its WAL together; no forced reset or automatic cancellation is provided.
 
-The v0.3 reference adds generic provider/payment/receipt adapter boundaries, bilateral agreement verification, and an immutable `CLOSED` state while preserving Interop #001 archives and exact-per-call behavior. `upto` and batch remain explicitly unsupported. See [REFERENCE-v0.3](docs/REFERENCE-v0.3.md) and the synthetic independent-provider Interop #002 foundation test.
+The v0.3 reference adds provider-neutral `GenericTerms`, separate `ProviderProfile` and `PaymentProfile` types, generic provider/payment/receipt adapter boundaries, and a bilateral lifecycle. `Journal.createBilateral()` stays `PROPOSED` until the provider's signed agreement is verified and journaled; only then can the session be activated for paid calls. Existing `Journal.create()` remains the legacy Interop #001 compatibility path, and v0.2 archives remain readable. `X402OfferReceiptEnvelopeValidator` checks receipt bindings but does not establish signature provenance. `upto` and batch remain explicitly unsupported. See [REFERENCE-v0.3](docs/REFERENCE-v0.3.md) and the synthetic independent-provider test covering agreement, multiple exact calls, reconciliation and closure.
 
 ### Evidence boundaries
 

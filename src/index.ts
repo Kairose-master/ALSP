@@ -7,3 +7,4 @@ export * from './evm.js';
 export * from './archive.js';
 export * from './adapters.js';
 export * from './agreement.js';
+export * from './state-machine.js';

@@ -29,7 +29,7 @@ export function createSessionAdapters(provider: ProviderAdapter, payment: Paymen
 /** x402 v2 offer/receipt composition point. It verifies the receipt's binding envelope;
  * chain finality remains the responsibility of a settlement evidence adapter.
  */
-export class X402OfferReceiptAdapter {
+export class X402OfferReceiptEnvelopeValidator {
   verify(call: Call, terms: Terms): { requestId: string; signer: string; responseHash: string; signedAt: string } {
     if (!call.wire || !call.prepared || call.wire.status < 200 || call.wire.status >= 300) throw new Error('No successful x402 response');
     const body = object(call.wire.body), offer = object(body.offer), receipt = object(body.receipt);
@@ -43,3 +43,5 @@ export class X402OfferReceiptAdapter {
     return { requestId: transaction.toLowerCase(), signer, responseHash: digest(body), signedAt };
   }
 }
+/** @deprecated Use X402OfferReceiptEnvelopeValidator; this validates bindings, not signatures. */
+export class X402OfferReceiptAdapter extends X402OfferReceiptEnvelopeValidator {}
