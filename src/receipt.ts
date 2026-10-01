@@ -41,3 +41,11 @@ export async function verifyDoctorReceipt(call: Call, terms: Terms, pins: Signer
   if (p.proof !== 'eip3009' || p.network !== terms.network || address(p.asset) !== address(terms.asset) || address(p.pay_to) !== address(terms.provider) || address(p.payer) !== address(terms.payer) || atomic(p.amount) !== atomic(call.amount) || hash32(p.nonce) !== a.nonce) throw new Error('Receipt belongs to another payment');
   return { requestId: text(r.request_id), signer, signedAt: text(r.signed_at), responseHash: digest(body) };
 }
+
+/** Provider-specific EIP-191 receipt verifier retained for Interop #001. */
+export class DoctorEip191ReceiptAdapter {
+  constructor(private readonly pins: SignerPin[], private readonly now = Date.now) {}
+  verifyReceipt(call: Call, terms: Terms): Promise<ReceiptEvidence> {
+    return verifyDoctorReceipt(call, terms, this.pins, this.now());
+  }
+}

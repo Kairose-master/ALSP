@@ -10,6 +10,21 @@ export interface Call {
   state: 'RESERVED' | 'AUTHORIZED' | 'SUBMITTED' | 'RECONCILIATION_REQUIRED' | 'VERIFIED';
   prepared: Prepared | null; wire: WireResponse | null; verified: Verified | null;
 }
+export type CallState = Call['state'];
+export const CALL_TRANSITIONS: Readonly<Record<CallState, readonly CallState[]>> = {
+  RESERVED: ['AUTHORIZED', 'RECONCILIATION_REQUIRED'], AUTHORIZED: ['SUBMITTED', 'RECONCILIATION_REQUIRED'],
+  SUBMITTED: ['RECONCILIATION_REQUIRED', 'VERIFIED'], RECONCILIATION_REQUIRED: ['VERIFIED'], VERIFIED: [],
+};
+export function assertCallTransition(from: CallState, to: CallState): void {
+  if (!CALL_TRANSITIONS[from].includes(to)) throw new Error(`Forbidden call transition: ${from} -> ${to}`);
+}
+export type SessionState = 'ACTIVE' | 'RECONCILIATION_REQUIRED' | 'CLOSED';
+export const SESSION_TRANSITIONS: Readonly<Record<SessionState, readonly SessionState[]>> = {
+  ACTIVE: ['RECONCILIATION_REQUIRED', 'CLOSED'], RECONCILIATION_REQUIRED: ['ACTIVE', 'CLOSED'], CLOSED: [],
+};
+export function assertSessionTransition(from: SessionState, to: SessionState): void {
+  if (!SESSION_TRANSITIONS[from].includes(to)) throw new Error(`Forbidden session transition: ${from} -> ${to}`);
+}
 export interface EventRow { seq: number; previous: string; head: string; event: unknown; }
 export class Journal {
   private db: DatabaseSync;
@@ -38,7 +53,9 @@ export class Journal {
   session(id: string): { terms: Terms; state: string; head: string; seq: number } {
     const row = this.db.prepare('SELECT * FROM sessions WHERE id=?').get(id);
     if (!row) throw new Error('Unknown session');
-    return { terms: JSON.parse(String(row.terms)) as Terms, state: String(row.state), head: String(row.head), seq: Number(row.seq) };
+    const stored = String(row.state);
+    const legacyEndedState = stored === 'ENDED' ? (this.calls(id).every(c => c.state === 'VERIFIED') ? 'CLOSED' : 'RECONCILIATION_REQUIRED') : stored;
+    return { terms: JSON.parse(String(row.terms)) as Terms, state: legacyEndedState, head: String(row.head), seq: Number(row.seq) };
   }
   create(terms: Terms, now = Date.now()): string {
     validateTerms(terms);
@@ -97,7 +114,7 @@ export class Journal {
     this.transaction(() => {
       const c = this.call(id);
       if (c.state !== 'RESERVED') throw new Error('Already authorized');
-      c.prepared = prepared; c.state = 'AUTHORIZED'; this.put(c);
+      assertCallTransition(c.state, 'AUTHORIZED'); c.prepared = prepared; c.state = 'AUTHORIZED'; this.put(c);
       // Signed bearer authorization stays in the 0600 journal, not the public log.
       this.append(c.sessionId, { kind: 'authorized', callId: id, paymentHash: digest(prepared) });
     });
@@ -106,7 +123,7 @@ export class Journal {
     this.transaction(() => {
       const c = this.call(id), s = this.session(c.sessionId);
       if (c.state !== 'AUTHORIZED' || !c.prepared || s.state !== 'ACTIVE' || now >= s.terms.expiresAt) throw new Error('Cannot submit');
-      c.state = 'SUBMITTED'; this.put(c);
+      assertCallTransition(c.state, 'SUBMITTED'); c.state = 'SUBMITTED'; this.put(c);
       this.append(c.sessionId, { kind: 'submission_intent', callId: id });
     });
   }
@@ -123,7 +140,12 @@ export class Journal {
     this.transaction(() => {
       const c = this.call(id);
       if (c.state === 'VERIFIED' || c.state === 'RECONCILIATION_REQUIRED') return;
-      c.state = 'RECONCILIATION_REQUIRED'; this.put(c);
+      assertCallTransition(c.state, 'RECONCILIATION_REQUIRED'); c.state = 'RECONCILIATION_REQUIRED'; this.put(c);
+      const s = this.session(c.sessionId);
+      if (s.state === 'ACTIVE') {
+        assertSessionTransition('ACTIVE', 'RECONCILIATION_REQUIRED');
+        this.db.prepare('UPDATE sessions SET state=? WHERE id=?').run('RECONCILIATION_REQUIRED', c.sessionId);
+      }
       this.append(c.sessionId, { kind: 'reconciliation_required', callId: id });
     });
   }
@@ -133,7 +155,7 @@ export class Journal {
       if (c.state === 'VERIFIED') return;
       if (!c.wire || !c.prepared) throw new Error('Missing evidence');
       this.db.prepare('INSERT INTO receipts VALUES(?,?)').run(`${s.terms.provider.toLowerCase()}:${proof.receipt.requestId}`, id);
-      c.verified = proof; c.state = 'VERIFIED'; this.put(c);
+      assertCallTransition(c.state, 'VERIFIED'); c.verified = proof; c.state = 'VERIFIED'; this.put(c);
       this.append(c.sessionId, { kind: 'verified', callId: id, amount: c.amount, proof });
     });
   }
@@ -141,10 +163,13 @@ export class Journal {
     this.transaction(() => {
       const s = this.session(sessionId), calls = this.calls(sessionId);
       if (s.state === 'ACTIVE') return;
+      if (s.state === 'CLOSED') throw new Error('Closed session is immutable');
+      if (s.state !== 'RECONCILIATION_REQUIRED') throw new Error('Session cannot resume from this state');
       if (now >= s.terms.expiresAt) throw new Error('Session expired');
       if (calls.some(c => c.state !== 'VERIFIED')) throw new Error('Unresolved call prevents resume');
       if (calls.length >= s.terms.maxCalls) throw new Error('Session call limit reached');
       if (calls.reduce((sum, c) => sum + atomic(c.amount), 0n) >= atomic(s.terms.maxTotal)) throw new Error('Session budget exhausted');
+      assertSessionTransition('RECONCILIATION_REQUIRED', 'ACTIVE');
       this.db.prepare('UPDATE sessions SET state=? WHERE id=?').run('ACTIVE', sessionId);
       this.append(sessionId, { kind: 'access_resumed', reason: 'continue_after_reconciliation' });
     });
@@ -152,16 +177,20 @@ export class Journal {
   end(sessionId: string): void {
     this.transaction(() => {
       const s = this.session(sessionId);
-      if (s.state !== 'ACTIVE') return;
-      this.db.prepare('UPDATE sessions SET state=? WHERE id=?').run('ENDED', sessionId);
-      this.append(sessionId, { kind: 'access_ended' });
+      if (s.state === 'CLOSED') return;
+      const calls = this.calls(sessionId);
+      const next = calls.every(c => c.state === 'VERIFIED') ? 'CLOSED' : 'RECONCILIATION_REQUIRED';
+      if (s.state === next) return;
+      assertSessionTransition(s.state as SessionState, next);
+      this.db.prepare('UPDATE sessions SET state=? WHERE id=?').run(next, sessionId);
+      this.append(sessionId, { kind: next === 'CLOSED' ? 'session_closed' : 'reconciliation_required', state: next });
     });
   }
   export(sessionId: string) {
     const s = this.session(sessionId), calls = this.calls(sessionId);
     const events: EventRow[] = this.db.prepare('SELECT * FROM events WHERE session_id=? ORDER BY seq').all(sessionId).map(r => ({ seq: Number(r.seq), previous: String(r.previous), head: String(r.head), event: JSON.parse(String(r.event)) as unknown }));
     return { profile: PROFILE, sessionId, terms: s.terms, termsHash: digest(s.terms), headHash: s.head, events,
-      summary: { state: s.state === 'ACTIVE' ? 'ACTIVE' : calls.every(c => c.state === 'VERIFIED') ? 'CLOSED' : 'RECONCILIATION_REQUIRED', allocatedTotal: calls.reduce((sum, c) => sum + atomic(c.amount), 0n).toString(), verifiedSpent: calls.filter(c => c.state === 'VERIFIED').reduce((sum, c) => sum + atomic(c.amount), 0n).toString(), unresolved: calls.filter(c => c.state !== 'VERIFIED').length, calls: calls.length, registryWrites: 0, settlementMode: 'exact-per-call', licenseAcceptance: 'buyer-only' },
+      summary: { state: s.state, allocatedTotal: calls.reduce((sum, c) => sum + atomic(c.amount), 0n).toString(), verifiedSpent: calls.filter(c => c.state === 'VERIFIED').reduce((sum, c) => sum + atomic(c.amount), 0n).toString(), unresolved: calls.filter(c => c.state !== 'VERIFIED').length, calls: calls.length, registryWrites: 0, settlementMode: 'exact-per-call', licenseAcceptance: 'buyer-only' },
       evidence: calls.map(c => ({ callId: c.id, input: c.input, quote: c.quote, nonce: c.nonce, wire: c.wire, verified: c.verified })) };
   }
 }

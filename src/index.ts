@@ -5,3 +5,5 @@ export * from './http.js';
 export * from './receipt.js';
 export * from './evm.js';
 export * from './archive.js';
+export * from './adapters.js';
+export * from './agreement.js';

@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 
-export const PROFILE = 'alsp-exact-session-v0.2';
+export const PROFILE = 'alsp-exact-session-v0.2'; // frozen wire/profile identifier for Interop #001 archives
 export const DOCTOR = 'https://x402-doctor.fizzl.eu';
 export const ROUTE = 'GET /api/v1/preflight';
 export const NETWORK = 'eip155:8453';
@@ -68,9 +68,11 @@ export interface Terms {
   license: { uri: string; sha256: string; acceptance: 'buyer-only' };
 }
 export function validateTerms(t: Terms): void {
-  if (t.profile !== PROFILE || t.network !== NETWORK || address(t.asset) !== address(ASSET) || address(t.provider) !== address(PAY_TO)) throw new Error('Unsupported payment profile');
+  if (t.profile !== PROFILE) throw new Error('Unsupported payment profile');
   address(t.payer);
-  if (t.endpoint !== `${DOCTOR}/api/v1/preflight`) throw new Error('Only Doctor preflight is supported');
+  address(t.provider); text(t.network); address(t.asset);
+  const endpoint = new URL(text(t.endpoint));
+  if (endpoint.protocol !== 'https:' || endpoint.username || endpoint.password || endpoint.hash) throw new Error('Invalid provider endpoint');
   if (atomic(t.maxTotal) <= 0n || atomic(t.maxPerCall) <= 0n || atomic(t.maxPerCall) > atomic(t.maxTotal)) throw new Error('Invalid budget');
   if (!Number.isSafeInteger(t.maxCalls) || t.maxCalls < 1 || t.maxCalls > 100) throw new Error('Invalid call limit');
   if (!Number.isSafeInteger(t.expiresAt)) throw new Error('Invalid expiry');
@@ -107,8 +109,12 @@ export function selectQuote(challenge: unknown, terms: Terms, input: RequestInpu
   for (const entry of c.accepts) {
     try {
       const a = object(entry), extra = object(a.extra);
+      // v0.3 currently exposes a generic exact-per-call boundary only. `upto` and
+      // batch options are intentionally rejected until settlement is implemented.
       if (a.scheme !== 'exact' || a.network !== terms.network || address(a.asset) !== address(terms.asset) || address(a.payTo) !== address(terms.provider)) continue;
-      if (extra.name !== 'USD Coin' || extra.version !== '2' || (extra.assetTransferMethod !== undefined && extra.assetTransferMethod !== 'eip3009')) continue;
+      // The legacy EVM signer speaks EIP-3009. Do not silently interpret a
+      // different transfer method as that authorization format.
+      if (extra.assetTransferMethod !== undefined && extra.assetTransferMethod !== 'eip3009') continue;
       if (!Number.isSafeInteger(a.maxTimeoutSeconds) || Number(a.maxTimeoutSeconds) < 1 || Number(a.maxTimeoutSeconds) > 300) continue;
       const amount = atomic(a.amount);
       if (amount === 0n || amount > atomic(terms.maxPerCall)) continue;

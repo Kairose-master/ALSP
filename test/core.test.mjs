@@ -3,13 +3,18 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync, statSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { Journal, verifyChain } from '../dist/journal.js';
+import { Journal, verifyChain, assertCallTransition, assertSessionTransition } from '../dist/journal.js';
 import { SessionClient } from '../dist/session.js';
 import { PROFILE, DOCTOR, ASSET, PAY_TO, NETWORK, canonical, digest, atomic, requestUrl, selectQuote, pack, unpack } from '../dist/protocol.js';
 import { doctorTransport, boundedFetch } from '../dist/http.js';
 
 const now = 1790770000000, payer = '0x1111111111111111111111111111111111111111';
 const input = { url: 'https://example.com/paid', method: 'GET' };
+test('normative call and session state machines reject terminal-state reopening', () => {
+  assert.throws(() => assertCallTransition('VERIFIED', 'SUBMITTED'), /Forbidden call transition/);
+  assert.throws(() => assertSessionTransition('CLOSED', 'ACTIVE'), /Forbidden session transition/);
+  assert.doesNotThrow(() => assertSessionTransition('RECONCILIATION_REQUIRED', 'ACTIVE'));
+});
 function terms(extra = {}) { return { profile: PROFILE, payer, provider: PAY_TO, network: NETWORK, asset: ASSET, endpoint: `${DOCTOR}/api/v1/preflight`, maxTotal: '3000', maxPerCall: '1000', maxCalls: 3, expiresAt: now + 600000, license: { uri: 'urn:synthetic:test-terms', sha256: digest('fixture-terms'), acceptance: 'buyer-only' }, ...extra }; }
 function challenge(extra = {}) { return { x402Version: 2, resource: { url: `${DOCTOR}/api/v1/preflight` }, accepts: [{ scheme: 'exact', network: NETWORK, asset: ASSET, payTo: PAY_TO, amount: '1000', maxTimeoutSeconds: 60, extra: { name: 'USD Coin', version: '2' }, ...extra }] }; }
 function fixture(t = terms()) {
@@ -134,19 +139,25 @@ test('RPC failure after capture can reconcile after restart without a signer or 
     assert.ok(verifyChain(b.export(id))); assert.equal(f.counts().sent, 1);
   } finally { b.close(); rmSync(dir, { recursive: true, force: true }); }
 });
-test('an early-ended session can resume only after reconciliation and continue within the original cap', async () => {
-  const f = fixture();
+test('a reconciliation session resumes only after evidence resolves, while CLOSED stays immutable', async () => {
+  const f = fixture(); let sends = 0;
   try {
+    f.adapters.send = async () => { throw new Error('response lost'); };
     const first = await f.client.call(f.id, 'one', input);
-    assert.equal(first.state, 'VERIFIED');
+    assert.equal(first.state, 'RECONCILIATION_REQUIRED');
     f.journal.end(f.id);
-    assert.equal(f.journal.export(f.id).summary.state, 'CLOSED');
+    assert.equal(f.journal.export(f.id).summary.state, 'RECONCILIATION_REQUIRED');
+    await f.client.reconcile(first.id, { status: 200, body: { synthetic: true }, settlement: {} });
     f.journal.resume(f.id, now);
     assert.equal(f.journal.session(f.id).state, 'ACTIVE');
+    f.adapters.send = async () => { sends++; return { status: 200, body: { synthetic: true }, settlement: {} }; };
     const second = await f.client.call(f.id, 'two', input);
     assert.equal(second.state, 'VERIFIED');
     assert.equal(f.journal.calls(f.id).length, 2);
-    assert.equal(f.counts().sent, 2);
+    assert.equal(sends, 1);
+    f.journal.end(f.id);
+    assert.equal(f.journal.session(f.id).state, 'CLOSED');
+    assert.throws(() => f.journal.resume(f.id, now), /immutable/);
   } finally { f.journal.close(); }
 });
 test('resume refuses unresolved, expired, exhausted or call-limit sessions', async () => {
