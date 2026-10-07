@@ -156,26 +156,9 @@ ALSP does not:
 - turn a buyer-only terms hash into provider assent;
 - require a specific chain.
 
-## Live implementation evidence
+## Implementation evidence
 
-The current reference implementation has completed a bounded live buyer-side run against x402 Doctor using ordinary x402 v2 `exact` payments on Base.
-
-Run shape:
-
-- paid service: x402 Doctor preflight;
-- payment network: Base (`eip155:8453`);
-- asset: USDC;
-- 3 calls at 0.001 USDC each;
-- one ALSP session;
-- 0.003 USDC allocated;
-- 0.003 USDC independently settlement-verified by the buyer;
-- 0 unresolved calls at completion;
-- zero additional registry writes;
-- final session state: `CLOSED`.
-
-The live run exercised reconciliation: when immediate verification was inconclusive, the client stopped rather than generating a replacement payment, reconciled the original evidence, and continued the same session.
-
-Provider-side log comparison has been requested and is **pending**. Until that comparison is complete, this result should be described as a live buyer-side verified interoperability run, not as externally cross-verified.
+The repository's `main` baseline contains a runnable buyer-side reference implementation and local tests. Those tests exercise real EIP-191/EIP-712 signatures and a local HTTP provider, but use **mock ledger evidence**. The free `doctor:probe` checks the live public 402 challenge and signer metadata without paying. No paid mainnet interoperability run is claimed by this baseline. A future run must be reported with its evidence and limitations in a separately reviewed update.
 
 ## Relationship to x402 core
 

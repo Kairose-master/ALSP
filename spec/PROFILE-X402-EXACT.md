@@ -1,4 +1,6 @@
-# ALSP exact-session v0.2: compatibility profile
+# ALSP x402 Exact Profile — reference v0.2
+
+**Status: experimental buyer-side compatibility implementation.** The `main` baseline has local tests and a free live challenge probe. Tests use mock ledger evidence; no paid mainnet interoperability run is claimed here. See the repository README for the current validation boundary.
 
 ## Scope
 

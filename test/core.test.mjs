@@ -3,10 +3,10 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync, statSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { Journal, verifyChain } from '../dist/journal.js';
-import { SessionClient } from '../dist/session.js';
-import { PROFILE, DOCTOR, ASSET, PAY_TO, NETWORK, canonical, digest, atomic, requestUrl, selectQuote, pack, unpack } from '../dist/protocol.js';
-import { doctorTransport, boundedFetch } from '../dist/http.js';
+import { Journal, verifyChain } from '../dist/profiles/x402-exact/journal.js';
+import { SessionClient } from '../dist/profiles/x402-exact/session.js';
+import { PROFILE, DOCTOR, ASSET, PAY_TO, NETWORK, canonical, digest, atomic, requestUrl, selectQuote, pack, unpack } from '../dist/profiles/x402-exact/protocol.js';
+import { doctorTransport, boundedFetch } from '../dist/profiles/x402-exact/http.js';
 
 const now = 1790770000000, payer = '0x1111111111111111111111111111111111111111';
 const input = { url: 'https://example.com/paid', method: 'GET' };

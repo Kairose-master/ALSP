@@ -1,4 +1,6 @@
-# ALSP v0.1 — Initial Protocol Snippet
+# ALSP License Profile — legacy v0.1 research design
+
+**Status: experimental design sketch.** This profile has no executable TypeScript implementation or completed payment integration in this repository. The legacy registry at `contracts/license/experimental/ALSPRegistry.sol` is unaudited, trusts a configured payment attestor, and is not a requirement of ALSP Core or the x402 Exact Profile.
 
 ALSP models paid knowledge/tool access as a **license session**, not as a file sale.
 

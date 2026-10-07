@@ -1,7 +1,9 @@
-export * from './protocol.js';
-export * from './journal.js';
-export * from './session.js';
-export * from './http.js';
-export * from './receipt.js';
-export * from './evm.js';
-export * from './archive.js';
+/** Backward-compatible package entry point for the x402 exact reference client. */
+export * from './core/types.js';
+export * from './profiles/x402-exact/protocol.js';
+export * from './profiles/x402-exact/journal.js';
+export * from './profiles/x402-exact/session.js';
+export * from './profiles/x402-exact/http.js';
+export * from './profiles/x402-exact/receipt.js';
+export * from './profiles/x402-exact/evm.js';
+export * from './profiles/x402-exact/archive.js';
