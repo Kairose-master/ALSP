@@ -18,14 +18,14 @@ How a session works (these rules are enforced by the journal; respect them rathe
 Style: before each tool call say in one short sentence what you are doing and why. Keep narration concrete (amounts, keys, states). Do not invent results; only report what tools returned. Respect the call limit and the mission's stated budget exactly.`;
 
 export const TOOLS = [
-  { name: 'probe_quote', description: 'Unpaid 402 probe. Returns the provider\'s current price and payout address for the given request parameters. Creates no signature.', input_schema: { type: 'object', properties: { input: { type: 'object', description: 'Request parameters, e.g. {"symbol":"BTC-USDT"} or for Doctor {"url":"https://…","method":"GET"}', additionalProperties: { type: 'string' } } }, required: ['input'], additionalProperties: false }, strict: true },
-  { name: 'create_session', description: 'Create the session terms. Amounts are atomic USDC strings (1000 = 0.001 USDC). Fails if above the human\'s hard caps.', input_schema: { type: 'object', properties: { maxTotal: { type: 'string' }, maxPerCall: { type: 'string' }, maxCalls: { type: 'integer', minimum: 1, maximum: 100 }, ttlSeconds: { type: 'integer', minimum: 60, maximum: 86400 }, licenseNote: { type: 'string', description: 'One line describing the provider terms you are accepting (buyer-only).' } }, required: ['maxTotal', 'maxPerCall', 'maxCalls', 'ttlSeconds', 'licenseNote'], additionalProperties: false }, strict: true },
-  { name: 'call', description: 'One paid call under the session: probe, reserve budget, sign once, send once, verify. Returns the call state, amount, tx and a summary of the paid response.', input_schema: { type: 'object', properties: { key: { type: 'string', description: 'Idempotency key, [A-Za-z0-9_.-]{1,100}' }, input: { type: 'object', additionalProperties: { type: 'string' } } }, required: ['key', 'input'], additionalProperties: false }, strict: true },
-  { name: 'reconcile', description: 'Resolve a RECONCILIATION_REQUIRED call using its original evidence. With recover=true, first ask the provider for the original response for that call\'s nonce (if it supports lookup). Never creates a payment.', input_schema: { type: 'object', properties: { callId: { type: 'string' }, recover: { type: 'boolean' } }, required: ['callId', 'recover'], additionalProperties: false }, strict: true },
-  { name: 'session_status', description: 'Current session summary: state, allocated, verified spent, unresolved calls, remaining calls and budget.', input_schema: { type: 'object', properties: {}, additionalProperties: false }, strict: true },
-  { name: 'end_session', description: 'Stop new calls. Exported state becomes CLOSED if every call is VERIFIED, else RECONCILIATION_REQUIRED.', input_schema: { type: 'object', properties: {}, additionalProperties: false }, strict: true },
-  { name: 'resume_session', description: 'Reopen an ended session to continue within its original cap. Refused while any call is unresolved.', input_schema: { type: 'object', properties: {}, additionalProperties: false }, strict: true },
-  { name: 'export_archive', description: 'Export the hash-chained archive and verify the chain. Returns summary, event count and head hash.', input_schema: { type: 'object', properties: {}, additionalProperties: false }, strict: true },
+  { name: 'probe_quote', description: 'Unpaid 402 probe. Returns the provider\'s current price and payout address for the given request parameters. Creates no signature.', input_schema: { type: 'object', properties: { input: { type: 'object', description: 'Request parameters, e.g. {"symbol":"BTC-USDT"} or for Doctor {"url":"https://…","method":"GET"}', additionalProperties: { type: 'string' } } }, required: ['input'], additionalProperties: false } },
+  { name: 'create_session', description: 'Create the session terms. Amounts are atomic USDC strings (1000 = 0.001 USDC). Fails if above the human\'s hard caps.', input_schema: { type: 'object', properties: { maxTotal: { type: 'string' }, maxPerCall: { type: 'string' }, maxCalls: { type: 'integer', minimum: 1, maximum: 100 }, ttlSeconds: { type: 'integer', minimum: 60, maximum: 86400 }, licenseNote: { type: 'string', description: 'One line describing the provider terms you are accepting (buyer-only).' } }, required: ['maxTotal', 'maxPerCall', 'maxCalls', 'ttlSeconds', 'licenseNote'], additionalProperties: false } },
+  { name: 'call', description: 'One paid call under the session: probe, reserve budget, sign once, send once, verify. Returns the call state, amount, tx and a summary of the paid response.', input_schema: { type: 'object', properties: { key: { type: 'string', description: 'Idempotency key, [A-Za-z0-9_.-]{1,100}' }, input: { type: 'object', additionalProperties: { type: 'string' } } }, required: ['key', 'input'], additionalProperties: false } },
+  { name: 'reconcile', description: 'Resolve a RECONCILIATION_REQUIRED call using its original evidence. With recover=true, first ask the provider for the original response for that call\'s nonce (if it supports lookup). Never creates a payment.', input_schema: { type: 'object', properties: { callId: { type: 'string' }, recover: { type: 'boolean' } }, required: ['callId', 'recover'], additionalProperties: false } },
+  { name: 'session_status', description: 'Current session summary: state, allocated, verified spent, unresolved calls, remaining calls and budget.', input_schema: { type: 'object', properties: {}, additionalProperties: false } },
+  { name: 'end_session', description: 'Stop new calls. Exported state becomes CLOSED if every call is VERIFIED, else RECONCILIATION_REQUIRED.', input_schema: { type: 'object', properties: {}, additionalProperties: false } },
+  { name: 'resume_session', description: 'Reopen an ended session to continue within its original cap. Refused while any call is unresolved.', input_schema: { type: 'object', properties: {}, additionalProperties: false } },
+  { name: 'export_archive', description: 'Export the hash-chained archive and verify the chain. Returns summary, event count and head hash.', input_schema: { type: 'object', properties: {}, additionalProperties: false } },
 ];
 
 function validMessages(value) {
@@ -46,11 +46,9 @@ export async function agentTurn(body, deps = {}) {
   const client = deps.client ?? (agentEnabled() ? new Anthropic({ maxRetries: 1, timeout: 60_000 }) : null);
   if (!client) return [503, { error: 'Agent mode is not configured on this deployment (set ANTHROPIC_API_KEY).' }];
   try {
-    const response = await client.beta.messages.create({
+    const response = await client.messages.create({
       model: deps.model ?? MODEL,
       max_tokens: 8000,
-      betas: ['server-side-fallback-2026-07-01'],
-      fallbacks: 'default',
       thinking: { type: 'adaptive', display: 'summarized' },
       output_config: { effort: 'medium' },
       system: [{ type: 'text', text: SYSTEM, cache_control: { type: 'ephemeral' } }],
@@ -61,7 +59,7 @@ export async function agentTurn(body, deps = {}) {
   } catch (err) {
     if (err instanceof Anthropic.AuthenticationError) return [503, { error: 'Agent mode: the deployment\'s Anthropic credential was rejected.' }];
     if (err instanceof Anthropic.RateLimitError) return [429, { error: 'Agent mode: rate limited, try again shortly.' }];
-    if (err instanceof Anthropic.APIError) return [502, { error: `Agent mode: model API error ${err.status}.` }];
+    if (err instanceof Anthropic.APIError) return [502, { error: `Agent mode: model API error ${err.status}: ${err.message}` }];
     throw err;
   }
 }
