@@ -70,7 +70,7 @@ code,.mono{font:11px var(--mono);word-break:break-all}pre{background:var(--bg);b
       <h2>Live settings</h2>
       <div class="actions" style="margin-top:0"><button id="connect">Connect wallet</button><span class="mono muted" id="wallet">not connected</span></div>
       <label>Provider profile JSON</label><textarea id="providerJson" class="code" rows="8"></textarea>
-      <div class="actions"><button id="fetchSigner">Fetch published signer</button></div><pre id="signerDoc" class="muted"></pre>
+      <div class="actions"><button id="fetchSigner">Fetch published signer</button><button id="usePublishedSigner">Use as pin</button></div><pre id="signerDoc" class="muted"></pre>
       <label>Receipt signer pin (verified independently)</label><input id="pin" placeholder="0x…">
       <label>Read-only RPC URL</label><input id="rpcUrl">
       <p class="hint">The agent proposes the terms; you confirm them once, then sign each payment in your wallet. It cannot exceed the hard caps above.</p>
