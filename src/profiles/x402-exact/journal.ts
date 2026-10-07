@@ -2,7 +2,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { chmodSync, closeSync, constants, existsSync, lstatSync, mkdirSync, openSync } from 'node:fs';
 import { dirname } from 'node:path';
-import { atomic, canonical, digest, inputOf, PROFILE, validateTerms, type Prepared, type Quote, type RequestInput, type Terms, type Verified, type WireResponse } from './protocol.js';
+import { atomic, canonical, digest, DOCTOR_PROVIDER, inputOf, PROFILE, validateTerms, type Prepared, type ProviderProfile, type Quote, type RequestInput, type Terms, type Verified, type WireResponse } from './protocol.js';
 
 export interface Call {
   id: string; sessionId: string; requestKey: string; requestHash: string;
@@ -13,7 +13,8 @@ export interface Call {
 export interface EventRow { seq: number; previous: string; head: string; event: unknown; }
 export class Journal {
   private db: DatabaseSync;
-  constructor(path: string) {
+  /** A journal is bound to one provider profile; its terms must match that profile. */
+  constructor(path: string, readonly provider: ProviderProfile = DOCTOR_PROVIDER) {
     if (path !== ':memory:') {
       mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
       if (existsSync(path)) {
@@ -41,7 +42,7 @@ export class Journal {
     return { terms: JSON.parse(String(row.terms)) as Terms, state: String(row.state), head: String(row.head), seq: Number(row.seq) };
   }
   create(terms: Terms, now = Date.now()): string {
-    validateTerms(terms);
+    validateTerms(terms, this.provider);
     if (terms.expiresAt <= now) throw new Error('Session already expired');
     const id = randomUUID();
     this.db.prepare('INSERT INTO sessions VALUES(?,?,?,?,?)').run(id, canonical(terms), 'ACTIVE', digest({ profile: PROFILE, sessionId: id, terms }), 0);
@@ -69,7 +70,7 @@ export class Journal {
   }
   find(sessionId: string, key: string, input: RequestInput): Call | null {
     if (!/^[\w.-]{1,100}$/.test(key)) throw new Error('Invalid idempotency key');
-    const requestHash = digest({ endpoint: this.session(sessionId).terms.endpoint, input: inputOf(input) });
+    const requestHash = digest({ endpoint: this.session(sessionId).terms.endpoint, input: inputOf(input, this.provider) });
     const row = this.db.prepare('SELECT value FROM calls WHERE session_id=? AND request_key=?').get(sessionId, key);
     if (!row) return null;
     const c = JSON.parse(String(row.value)) as Call;
@@ -86,7 +87,7 @@ export class Journal {
       if (amount <= 0n || amount > atomic(s.terms.maxPerCall) || calls.length >= s.terms.maxCalls) throw new Error('Per-call policy exceeded');
       // Include every unresolved reservation: a network error never frees funds.
       if (calls.reduce((sum, c) => sum + atomic(c.amount), 0n) + amount > atomic(s.terms.maxTotal)) throw new Error('Session budget exceeded');
-      const c: Call = { id: randomUUID(), sessionId, requestKey: key, requestHash: digest({ endpoint: s.terms.endpoint, input: inputOf(input) }), input, quote, amount: amount.toString(), nonce: `0x${randomBytes(32).toString('hex')}`, createdAt: now, state: 'RESERVED', prepared: null, wire: null, verified: null };
+      const c: Call = { id: randomUUID(), sessionId, requestKey: key, requestHash: digest({ endpoint: s.terms.endpoint, input: inputOf(input, this.provider) }), input, quote, amount: amount.toString(), nonce: `0x${randomBytes(32).toString('hex')}`, createdAt: now, state: 'RESERVED', prepared: null, wire: null, verified: null };
       this.db.prepare('INSERT INTO calls VALUES(?,?,?,?)').run(c.id, sessionId, key, canonical(c));
       this.db.prepare('INSERT INTO payments VALUES(?,?)').run(`${s.terms.network}:${s.terms.asset.toLowerCase()}:${s.terms.payer.toLowerCase()}:${c.nonce}`, c.id);
       this.append(sessionId, { kind: 'reserved', callId: c.id, requestKey: key, requestHash: c.requestHash, amount: c.amount, nonce: c.nonce });

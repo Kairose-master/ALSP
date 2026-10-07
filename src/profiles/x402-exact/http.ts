@@ -1,11 +1,11 @@
-import { DOCTOR, object, pack, unpack, type Prepared, type WireResponse } from './protocol.js';
+import { canonical, DOCTOR_PROVIDER, object, pack, unpack, type Prepared, type ProviderProfile, type WireResponse } from './protocol.js';
 
 export const INTEROP_USER_AGENT = 'alsp-interop/001';
 
-/** No automatic retries, redirects, paid fetch wrappers, cookies or credentials. */
-export async function boundedFetch(url: string, init: RequestInit = {}, fetchImpl: typeof fetch = fetch): Promise<{ status: number; headers: Headers; body: unknown }> {
-  const u = new URL(url);
-  if (u.origin !== DOCTOR || !['/api/v1/preflight', '/.well-known/x402-doctor-signer.json'].includes(u.pathname) || u.username || u.password || u.hash) throw new Error('Unapproved upstream');
+/** No automatic retries, redirects, paid fetch wrappers, cookies or credentials. Only the profile's origin and paths are reachable. */
+export async function boundedFetch(url: string, init: RequestInit = {}, fetchImpl: typeof fetch = fetch, p: ProviderProfile = DOCTOR_PROVIDER): Promise<{ status: number; headers: Headers; body: unknown }> {
+  const u = new URL(url), allowed = [p.endpointPath, ...(p.signerPath ? [p.signerPath] : [])];
+  if (u.origin !== p.origin || !allowed.includes(u.pathname) || u.username || u.password || u.hash) throw new Error('Unapproved upstream');
   const headers = new Headers(init.headers);
   if (!headers.has('user-agent')) headers.set('user-agent', INTEROP_USER_AGENT);
   const controller = new AbortController();
@@ -33,24 +33,26 @@ export async function boundedFetch(url: string, init: RequestInit = {}, fetchImp
   try { return await Promise.race([task, deadline]); }
   finally { clearTimeout(timeout!); controller.abort(); }
 }
-export function doctorTransport(fetchImpl: typeof fetch = fetch) {
+/** x402 v2 `exact` transport for one provider profile: unpaid 402 probe and a single paid submission. */
+export function x402Transport(p: ProviderProfile, fetchImpl: typeof fetch = fetch) {
   return {
     async probe(url: string): Promise<unknown> {
-      const r = await boundedFetch(url, { method: 'GET' }, fetchImpl);
+      const r = await boundedFetch(url, { method: p.method }, fetchImpl, p);
       if (r.status !== 402) throw new Error(`Expected HTTP 402, got ${r.status}`);
       const challenge = unpack(r.headers.get('payment-required'));
       // A non-empty JSON body is a mirror, not an alternative authority.
       if (r.body && Object.keys(object(r.body)).length && object(r.body).x402Version !== undefined) {
-        const { canonical } = await import('./protocol.js');
         if (canonical(r.body) !== canonical(challenge)) throw new Error('Conflicting challenge body/header');
       }
       return challenge;
     },
     async send(url: string, payment: Prepared): Promise<WireResponse> {
       const payload = { x402Version: 2, resource: payment.quote.resource, accepted: payment.quote.accepted, payload: { signature: payment.signature, authorization: payment.authorization } };
-      const r = await boundedFetch(url, { method: 'GET', headers: { 'payment-signature': pack(payload), accept: 'application/json' } }, fetchImpl);
+      const r = await boundedFetch(url, { method: p.method, headers: { 'payment-signature': pack(payload), accept: 'application/json' } }, fetchImpl, p);
       const header = r.headers.get('payment-response');
       return { status: r.status, body: r.body, settlement: header ? unpack(header) : null };
     },
   };
 }
+/** Backward-compatible transport bound to the pinned Doctor profile. */
+export const doctorTransport = (fetchImpl: typeof fetch = fetch) => x402Transport(DOCTOR_PROVIDER, fetchImpl);
