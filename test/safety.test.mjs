@@ -30,7 +30,7 @@ test('rerunning paid CLI with an unfinished journal cannot silently create a fre
   const j = new Journal(db); const id = j.create(terms); j.close();
   const blockNetwork = 'data:text/javascript,globalThis.fetch=()=>{console.error("UNEXPECTED_NETWORK");process.exit(88)}';
   try {
-    const result = spawnSync(process.execPath, ['--import', blockNetwork, 'scripts/doctor.mjs', 'paid', '--journal', db, '--max-total', '3000', '--calls', '3', '--terms-file', file], {
+    const result = spawnSync(process.execPath, ['--import', blockNetwork, 'examples/doctor/doctor.mjs', 'paid', '--journal', db, '--max-total', '3000', '--calls', '3', '--terms-file', file], {
       cwd: process.cwd(), encoding: 'utf8', timeout: 10000,
       env: { ...process.env, ALSP_ENABLE_MAINNET: 'I_ACCEPT_EXACT_PER_CALL_SPEND', ALSP_PRIVATE_KEY: key, ALSP_RECEIPT_SIGNER: seller.address },
     });
@@ -40,7 +40,7 @@ test('rerunning paid CLI with an unfinished journal cannot silently create a fre
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 test('paid mode without explicit opt-in fails before network or signing', () => {
-  const result = spawnSync(process.execPath, ['--import', 'data:text/javascript,globalThis.fetch=()=>process.exit(88)', 'scripts/doctor.mjs', 'paid'], {
+  const result = spawnSync(process.execPath, ['--import', 'data:text/javascript,globalThis.fetch=()=>process.exit(88)', 'examples/doctor/doctor.mjs', 'paid'], {
     cwd: process.cwd(), encoding: 'utf8', timeout: 10000,
     env: { ...process.env, ALSP_ENABLE_MAINNET: '', ALSP_PRIVATE_KEY: '', ALSP_RECEIPT_SIGNER: seller.address },
   });

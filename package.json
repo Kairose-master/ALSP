@@ -8,9 +8,9 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "npm run build && node --test test/*.test.mjs",
-    "doctor:probe": "npm run build --silent && node scripts/doctor.mjs probe",
-    "doctor:paid": "npm run build --silent && node scripts/doctor.mjs paid",
-    "doctor:reconcile": "npm run build --silent && node scripts/doctor.mjs reconcile"
+    "doctor:probe": "npm run build --silent && node examples/doctor/doctor.mjs probe",
+    "doctor:paid": "npm run build --silent && node examples/doctor/doctor.mjs paid",
+    "doctor:reconcile": "npm run build --silent && node examples/doctor/doctor.mjs reconcile"
   },
   "dependencies": { "viem": "2.56.8" },
   "devDependencies": { "@types/node": "22.15.30", "typescript": "5.9.2" }
