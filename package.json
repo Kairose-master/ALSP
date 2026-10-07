@@ -17,6 +17,7 @@
     "vercel-build": "npm run build"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.131.0",
     "viem": "2.56.8"
   },
   "devDependencies": {

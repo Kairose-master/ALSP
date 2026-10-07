@@ -53,7 +53,9 @@ The runner persists reservation, nonce, signed authorization, submission intent,
 npm run demo          # http://127.0.0.1:3402
 ```
 
-Deploy to Vercel as-is (`vercel.json`, `api/index.js`). Optional env: `ALSP_RPC_URL` (read-only HTTPS RPC for `eip155:8453`), `ALSP_ALLOWED_ORIGINS` (restrict which provider origins the proxy forwards to). Real Base USDC is spent; start with the smallest caps, pin the receipt signer from an independent source, and never delete a journal with unresolved calls.
+Two more pages ship with the client: `learn.html`, a step-by-step walkthrough of the session concept on a simulated provider, and `agent.html`, where an AI agent (Claude, via `demo/agent.mjs`) is given a mission and hard caps and runs a whole session itself: terms, budgeted calls, a lost response, reconciliation, export and report. The model only decides; every tool executes in the browser on the real journal, in a free sandbox or live with your wallet.
+
+Deploy to Vercel as-is (`vercel.json`, `api/index.js`). Optional env: `ALSP_RPC_URL` (read-only HTTPS RPC for `eip155:8453`), `ALSP_ALLOWED_ORIGINS` (restrict which provider origins the proxy forwards to), `ANTHROPIC_API_KEY` and `ANTHROPIC_MODEL` (enable the agent page; default model `claude-opus-5-5`). Real Base USDC is spent; start with the smallest caps, pin the receipt signer from an independent source, and never delete a journal with unresolved calls.
 
 ## Repository map
 

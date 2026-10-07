@@ -106,3 +106,26 @@ test('send endpoint re-validates the signed authorization against the terms and 
   await assert.rejects(h.api.send(providerJson, h.terms, { symbol: 'BTC-USDT' }, prepared, `0x${'78'.repeat(32)}`), /changed payment parameters/);
   assert.equal(h.mock.state.paid, 0);
 });
+
+// ---------- agent turn route ----------
+import { TOOLS, agentTurn } from '../demo/agent.mjs';
+test('agent turn forwards a validated transcript to the model with the ALSP tools and returns its content', async () => {
+  let seen;
+  const client = { beta: { messages: { create: async params => { seen = params; return { content: [{ type: 'text', text: 'Creating the session.' }, { type: 'tool_use', id: 'tu_1', name: 'create_session', input: { maxTotal: '3000', maxPerCall: '1000', maxCalls: 3, ttlSeconds: 600, licenseNote: 'demo' } }], stop_reason: 'tool_use', model: 'fake', usage: { input_tokens: 10, output_tokens: 5 } }; } } } };
+  const [status, data] = await agentTurn({ messages: [{ role: 'user', content: 'Mission: buy a quote' }] }, { client });
+  assert.equal(status, 200); assert.equal(data.stop_reason, 'tool_use'); assert.equal(data.content[1].name, 'create_session');
+  assert.deepEqual(seen.tools.map(t => t.name), TOOLS.map(t => t.name)); assert.ok(seen.tools.every(t => t.strict === true));
+  assert.equal(seen.messages.length, 1); assert.ok(seen.system[0].text.includes('RECONCILIATION_REQUIRED'));
+  for (const bad of [{}, { messages: [] }, { messages: [{ role: 'assistant', content: 'x' }] }, { messages: [{ role: 'user', content: 5 }] }]) {
+    await assert.rejects(agentTurn(bad, { client }));
+  }
+  const [unconfigured] = await agentTurn({ messages: [{ role: 'user', content: 'x' }] }, {});
+  assert.equal(unconfigured, process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN ? 200 : 503);
+});
+test('agent route is reachable through the handler and reports its availability in meta', async () => {
+  const [, meta] = await handle('GET', '/api/meta', '');
+  assert.equal(typeof meta.agent.enabled, 'boolean'); assert.ok(meta.agent.model);
+  const client = { beta: { messages: { create: async () => ({ content: [{ type: 'text', text: 'done' }], stop_reason: 'end_turn', model: 'fake', usage: {} }) } } };
+  const [status, data] = await handle('POST', '/api/agent/turn', JSON.stringify({ messages: [{ role: 'user', content: 'hi' }] }), { agent: { client } });
+  assert.equal(status, 200); assert.equal(data.stop_reason, 'end_turn');
+});
