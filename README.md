@@ -40,6 +40,21 @@ The runner persists reservation, nonce, signed authorization, submission intent,
 - Buyer-sealed archive: integrity of the buyer's local record, not provider assent, log completeness, or billing fairness.
 - No registry write or final-head anchoring is implemented in this profile.
 
+## Web client (wallet-signed, any x402 exact provider)
+
+`public/` is a browser client for the same profile, and `api/index.js` / `demo/server.mjs` expose a **stateless** proxy + verifier built from the library. Design:
+
+- **Your wallet signs.** Each EIP-3009 `TransferWithAuthorization` is signed by an injected EIP-1193 wallet (MetaMask etc.) with `eth_signTypedData_v4`; the buyer seal uses `personal_sign`. No server ever sees a private key.
+- **Your browser keeps the journal.** `public/alsp-browser.js` mirrors the Node journal (reserve → authorized → submission intent → response → verified, same budgets, same hash chain) in `localStorage`, one atomic write per transition, committed before the network side effect. Exported archives verify with the library's `verifyChain` / `verifyBuyerSeal`.
+- **The server is replaceable.** It only fetches the 402 challenge, forwards one signed payment, runs `verifyReceipt` + `verifySettlement`, and checks archives. It stores nothing. Run your own: anything you proxy through sees the bearer authorization in transit.
+- **Any provider.** A `ProviderProfile` (origin, paid path, network, asset, payout address, receipt binding) replaces the former hard-coded Doctor constants; `DOCTOR_PROVIDER` is the preset. Custom profiles get generic request/body validation; providers must emit the `eip191-canonical-json-v1` receipt format.
+
+```bash
+npm run demo          # http://127.0.0.1:3402
+```
+
+Deploy to Vercel as-is (`vercel.json`, `api/index.js`). Optional env: `ALSP_RPC_URL` (read-only HTTPS RPC for `eip155:8453`), `ALSP_ALLOWED_ORIGINS` (restrict which provider origins the proxy forwards to). Real Base USDC is spent; start with the smallest caps, pin the receipt signer from an independent source, and never delete a journal with unresolved calls.
+
 ## Repository map
 
 - `src/core/` — shared, payment-agnostic protocol vocabulary.
@@ -47,7 +62,8 @@ The runner persists reservation, nonce, signed authorization, submission intent,
 - `src/profiles/license/` — reserved for a future executable License Profile; current legacy fixtures remain in `examples/knowledge-api/`.
 - `spec/` — Core and profile specifications.
 - `contracts/license/experimental/` — legacy Solidity research sketch, outside Core requirements.
-- `examples/doctor/` — x402 Exact client example.
+- `examples/doctor/` — x402 Exact client example (CLI).
+- `public/`, `demo/`, `api/` — wallet-signed web client, local server and Vercel function.
 - `examples/knowledge-api/` — legacy check-in/check-out fixtures.
 
 The package root `dist/index.js` remains a backward-compatible entry point for the x402 Exact reference exports. Direct implementation imports should use `dist/profiles/x402-exact/`.

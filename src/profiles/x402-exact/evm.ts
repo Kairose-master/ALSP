@@ -1,12 +1,13 @@
 import { keccak256, toHex } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
-import { address, atomic, hash32, object, type LedgerEvidence, type Prepared, type Quote, type Terms } from './protocol.js';
+import { address, atomic, chainIdOf, hash32, object, type LedgerEvidence, type Prepared, type Quote, type Terms } from './protocol.js';
 import type { Call } from './journal.js';
 
 export const AUTHORIZATION_TYPES = { TransferWithAuthorization: [
   { name: 'from', type: 'address' }, { name: 'to', type: 'address' }, { name: 'value', type: 'uint256' },
   { name: 'validAfter', type: 'uint256' }, { name: 'validBefore', type: 'uint256' }, { name: 'nonce', type: 'bytes32' },
 ] } as const;
+/** EIP-3009 signer. The EIP-712 domain name/version come from the quote's `extra`, the chain from the terms' network. */
 export function evmSigner(privateKey: `0x${string}`) {
   const account = privateKeyToAccount(privateKey);
   return {
@@ -18,7 +19,7 @@ export function evmSigner(privateKey: `0x${string}`) {
       const authorization = { from: account.address, to: quote.accepted.payTo, value: quote.accepted.amount, nonce,
         validAfter: String(Math.max(0, seconds - 5)), validBefore: String(Math.min(seconds + quote.accepted.maxTimeoutSeconds, Math.floor(terms.expiresAt / 1000))) };
       const signature = await account.signTypedData({
-        domain: { name: 'USD Coin', version: '2', chainId: 8453, verifyingContract: terms.asset as `0x${string}` },
+        domain: { name: String(quote.accepted.extra.name), version: String(quote.accepted.extra.version), chainId: chainIdOf(terms.network), verifyingContract: terms.asset as `0x${string}` },
         primaryType: 'TransferWithAuthorization', types: AUTHORIZATION_TYPES,
         message: { from: account.address, to: authorization.to as `0x${string}`, value: atomic(authorization.value), validAfter: BigInt(authorization.validAfter), validBefore: BigInt(authorization.validBefore), nonce: nonce as `0x${string}` },
       });
@@ -34,9 +35,11 @@ function hexInt(v: unknown): bigint {
   return BigInt(v);
 }
 export type Rpc = (method: string, params: unknown[]) => Promise<unknown>;
-export function baseRpc(url = 'https://mainnet.base.org', fetchImpl: typeof fetch = fetch): Rpc {
+const LOOPBACK = /^(localhost|127\.(?:\d{1,3}\.){2}\d{1,3}|\[::1\])$/;
+/** Read-only JSON-RPC client. HTTPS is required except for loopback hosts (local demo chains). */
+export function jsonRpc(url: string, fetchImpl: typeof fetch = fetch): Rpc {
   const u = new URL(url);
-  if (u.protocol !== 'https:' || u.username || u.password || u.hash) throw new Error('RPC must be explicitly configured HTTPS');
+  if (!(u.protocol === 'https:' || (u.protocol === 'http:' && LOOPBACK.test(u.hostname))) || u.username || u.password || u.hash) throw new Error('RPC must be explicitly configured HTTPS (HTTP only on loopback)');
   let id = 0;
   return async (method, params) => {
     if (!['eth_chainId', 'eth_getTransactionReceipt', 'eth_getBlockByNumber', 'eth_blockNumber', 'eth_call'].includes(method)) throw new Error('Read-only RPC method required');
@@ -56,14 +59,16 @@ export function baseRpc(url = 'https://mainnet.base.org', fetchImpl: typeof fetc
     } finally { clearTimeout(timer); ctrl.abort(); }
   };
 }
-/** Checks trusted RPC evidence separately from the server's signed receipt. */
-export async function verifyBaseSettlement(call: Call, terms: Terms, rpc: Rpc, minConfirmations = 2): Promise<LedgerEvidence> {
+/** Backward-compatible Base mainnet RPC factory. */
+export const baseRpc = (url = 'https://mainnet.base.org', fetchImpl: typeof fetch = fetch): Rpc => jsonRpc(url, fetchImpl);
+/** Checks trusted RPC evidence separately from the server's signed receipt. The expected chain comes from the terms' network. */
+export async function verifySettlement(call: Call, terms: Terms, rpc: Rpc, minConfirmations = 2): Promise<LedgerEvidence> {
   if (!Number.isSafeInteger(minConfirmations) || minConfirmations < 1 || minConfirmations > 100) throw new Error('Invalid confirmations');
   if (!call.wire || !call.prepared) throw new Error('Missing payment evidence');
   const settlement = object(call.wire.settlement);
   if (settlement.success !== true || settlement.network !== terms.network || (settlement.payer !== undefined && address(settlement.payer) !== address(terms.payer))) throw new Error('No successful settlement response');
   const tx = hash32(settlement.transaction);
-  if (hexInt(await rpc('eth_chainId', [])) !== 8453n) throw new Error('RPC is not Base mainnet');
+  if (hexInt(await rpc('eth_chainId', [])) !== BigInt(chainIdOf(terms.network))) throw new Error('RPC chain does not match the session network');
   const receipt = object(await rpc('eth_getTransactionReceipt', [tx]));
   if (receipt.status !== '0x1' || hash32(receipt.transactionHash) !== tx || !Array.isArray(receipt.logs)) throw new Error('Transaction not successful');
   const block = hexInt(receipt.blockNumber), blockHash = hash32(receipt.blockHash);
@@ -82,3 +87,5 @@ export async function verifyBaseSettlement(call: Call, terms: Terms, rpc: Rpc, m
   if (!nonceFound || !transferFound) throw new Error('Missing bound USDC authorization/transfer logs');
   return { transaction: tx, blockHash, blockNumber: block.toString(), confirmations: Number(latest - block + 1n), verification: 'rpc-confirmed' };
 }
+/** Backward-compatible alias; the chain is taken from the terms' network. */
+export const verifyBaseSettlement = verifySettlement;

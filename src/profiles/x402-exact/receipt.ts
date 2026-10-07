@@ -1,5 +1,5 @@
 import { recoverMessageAddress } from 'viem';
-import { address, atomic, canonical, digest, hash32, inputOf, object, ROUTE, text, type ReceiptEvidence, type Terms } from './protocol.js';
+import { address, atomic, canonical, digest, DOCTOR_PROVIDER, hash32, inputOf, object, text, type ProviderProfile, type ReceiptEvidence, type Terms } from './protocol.js';
 import type { Call } from './journal.js';
 
 export interface SignerPin { address: string; validFrom?: string; validUntil?: string; }
@@ -8,14 +8,15 @@ function timestamp(value: unknown): number {
   if (!Number.isFinite(n) || new Date(n).toISOString() !== s) throw new Error('Invalid receipt timestamp');
   return n;
 }
-/** Verifies provenance and request/payment binding, NOT the truth of a verdict. */
-export async function verifyDoctorReceipt(call: Call, terms: Terms, pins: SignerPin[], now = Date.now()): Promise<ReceiptEvidence> {
+/**
+ * Verifies provenance and request/payment binding of an `eip191-canonical-json-v1` receipt, NOT the truth of the response.
+ * The receipt format is the one Doctor documents; any provider that emits it can be verified with its own profile.
+ */
+export async function verifyReceipt(call: Call, terms: Terms, pins: SignerPin[], p: ProviderProfile = DOCTOR_PROVIDER, now = Date.now()): Promise<ReceiptEvidence> {
   if (!call.wire || !call.prepared || call.wire.status !== 200) throw new Error('No successful JSON response');
   const body = object(call.wire.body), r = object(body.receipt);
-  if (!['go', 'caution', 'no_go'].includes(String(body.verdict)) || typeof body.safe_to_pay !== 'boolean' || typeof body.summary !== 'string' || !Array.isArray(body.options) || !Array.isArray(body.reasons)) throw new Error('Invalid preflight response shape');
-  object(body.signals);
-  if (body.recommended_option !== null && (!Number.isSafeInteger(body.recommended_option) || Number(body.recommended_option) < 0 || Number(body.recommended_option) >= body.options.length)) throw new Error('Invalid recommended option');
-  if (r.algorithm !== 'eip191-canonical-json-v1' || r.route !== ROUTE || r.input_sha256 !== digest({ route: ROUTE, input: inputOf(call.input) })) throw new Error('Wrong algorithm or request binding');
+  p.validateBody?.(body);
+  if (r.algorithm !== 'eip191-canonical-json-v1' || r.route !== p.receipt.route || r.input_sha256 !== digest({ route: p.receipt.route, input: inputOf(call.input, p) })) throw new Error('Wrong algorithm or request binding');
   const signedAt = timestamp(r.signed_at);
   if (signedAt < call.createdAt - 60000 || signedAt > now + 30000) throw new Error('Receipt outside request time window');
   const signature = text(r.signature);
@@ -30,14 +31,16 @@ export async function verifyDoctorReceipt(call: Call, terms: Terms, pins: Signer
   if (!pinned) {
     // A rotated key must be certified by the separately pinned payout authority.
     const cert = object(r.cert);
-    if (cert.service !== 'x402-doctor' || address(cert.signer) !== signer || address(cert.authority) !== address(terms.provider) || !/^\d{4}-\d{2}-\d{2}$/.test(text(cert.valid_from))) throw new Error('Untrusted signing key');
+    if (cert.service !== p.receipt.service || address(cert.signer) !== signer || address(cert.authority) !== address(terms.provider) || !/^\d{4}-\d{2}-\d{2}$/.test(text(cert.valid_from))) throw new Error('Untrusted signing key');
     const validFrom = Date.parse(`${cert.valid_from}T00:00:00.000Z`);
     if (!Number.isFinite(validFrom) || new Date(validFrom).toISOString().slice(0, 10) !== cert.valid_from || signedAt < validFrom) throw new Error('Invalid certificate date');
-    const message = `fizzl receipt signer\nservice: ${cert.service}\nsigner: ${cert.signer}\nvalid_from: ${cert.valid_from}`;
+    const message = `${p.receipt.certHeader}\nservice: ${cert.service}\nsigner: ${cert.signer}\nvalid_from: ${cert.valid_from}`;
     const authority = await recoverMessageAddress({ message, signature: text(cert.signature) as `0x${string}` });
     if (address(authority) !== address(terms.provider)) throw new Error('Invalid signer certificate');
   }
-  const p = object(r.payment), a = call.prepared.authorization;
-  if (p.proof !== 'eip3009' || p.network !== terms.network || address(p.asset) !== address(terms.asset) || address(p.pay_to) !== address(terms.provider) || address(p.payer) !== address(terms.payer) || atomic(p.amount) !== atomic(call.amount) || hash32(p.nonce) !== a.nonce) throw new Error('Receipt belongs to another payment');
+  const pay = object(r.payment), a = call.prepared.authorization;
+  if (pay.proof !== 'eip3009' || pay.network !== terms.network || address(pay.asset) !== address(terms.asset) || address(pay.pay_to) !== address(terms.provider) || address(pay.payer) !== address(terms.payer) || atomic(pay.amount) !== atomic(call.amount) || hash32(pay.nonce) !== a.nonce) throw new Error('Receipt belongs to another payment');
   return { requestId: text(r.request_id), signer, signedAt: text(r.signed_at), responseHash: digest(body) };
 }
+/** Backward-compatible verifier bound to the pinned Doctor profile. */
+export const verifyDoctorReceipt = (call: Call, terms: Terms, pins: SignerPin[], now = Date.now()) => verifyReceipt(call, terms, pins, DOCTOR_PROVIDER, now);

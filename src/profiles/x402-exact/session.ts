@@ -14,7 +14,8 @@ export class SessionClient {
     // Never re-probe, re-sign or automatically resend a persisted request.
     if (existing) return existing;
     const terms = this.journal.session(sessionId).terms;
-    const url = requestUrl(terms, input), quote = selectQuote(await this.adapters.probe(url), terms, input);
+    const p = this.journal.provider;
+    const url = requestUrl(terms, input, p), quote = selectQuote(await this.adapters.probe(url), terms, input, p);
     const reserved = this.journal.reserve(sessionId, key, input, quote, this.now());
     if (!reserved.created) return reserved.call;
     const c = reserved.call;
