@@ -11,6 +11,7 @@ How a session works (these rules are enforced by the journal; respect them rathe
 - Terms come first: create_session commits payer, provider, two atomic budgets (maxTotal, maxPerCall), a call limit and an expiry. 1000 atomic = 0.001 USDC. Stay inside the caps the human gave you; never ask for more.
 - Each paid call needs a unique request key. Reusing a key with the same input is a free replay; reusing it with different input is an error. Pick keys like "quote-btc".
 - The journal commits before every side effect. A call that ends RECONCILIATION_REQUIRED may or may not have been paid: never call again with a new key to "retry" it. Use reconcile (with recover=true first if no response was stored). If it still cannot be verified, say so and leave it unresolved; do not spend around it.
+- A RECONCILIATION_REQUIRED result carries lastError. "Insufficient confirmations" or an RPC error is transient: call reconcile with recover=false (at most twice). "Receipt" / "signer" / "Pinned" errors are final: the evidence was rejected, so report it and stop spending.
 - Budget counts every reservation, including unresolved ones. probe_quote is free and tells you the current price before you commit.
 - When the mission is done or blocked: end_session, then export_archive, then give the human a short final report: what was bought, what it cost, anything unresolved, and the archive head hash.
 

@@ -129,3 +129,22 @@ test('agent route is reachable through the handler and reports its availability 
   const [status, data] = await handle('POST', '/api/agent/turn', JSON.stringify({ messages: [{ role: 'user', content: 'hi' }] }), { agent: { client } });
   assert.equal(status, 200); assert.equal(data.stop_reason, 'end_turn');
 });
+test('verify route waits out transient settlement errors but not final ones', async () => {
+  const h = await harness();
+  const providerJson = JSON.parse(JSON.stringify(h.mock.profile));
+  const { quote } = await h.api.probe(providerJson, h.terms, { symbol: 'BTC-USDT' });
+  const c = await h.client.call(h.sessionId, 'one', { symbol: 'BTC-USDT' });
+  assert.equal(c.state, 'VERIFIED');
+  // Simulate an RPC that has not indexed the receipt yet, then catches up.
+  let rpcHits = 0;
+  const lagging = async (url, init) => { if (new URL(url).pathname === '/rpc' && JSON.parse(init.body).method === 'eth_getTransactionReceipt' && ++rpcHits < 3) return new Response(JSON.stringify({ jsonrpc: '2.0', id: JSON.parse(init.body).id, result: null }), { headers: { 'content-type': 'application/json' } }); return h.mock.fetchImpl(url, init); };
+  const post = async (deps) => handle('POST', '/api/x402/verify', JSON.stringify({ provider: providerJson, terms: h.terms, call: { ...c, verified: null }, pins: [{ address: h.mock.signer }], rpcUrl: 'https://oracle.example/rpc' }), deps);
+  const [status, data] = await post({ fetchImpl: lagging, settleAttempts: 5, settleDelayMs: 1 });
+  assert.equal(status, 200); assert.equal(data.verified.ledger.verification, 'rpc-confirmed'); assert.equal(rpcHits, 3);
+  rpcHits = 0;
+  const [impatient] = await post({ fetchImpl: lagging, settleAttempts: 1, settleDelayMs: 1 });
+  assert.equal(impatient, 400);
+  const [rejected, why] = await handle('POST', '/api/x402/verify', JSON.stringify({ provider: providerJson, terms: h.terms, call: { ...c, verified: null }, pins: [{ address: h.mock.stranger }], rpcUrl: 'https://oracle.example/rpc' }), { fetchImpl: h.mock.fetchImpl, settleAttempts: 5, settleDelayMs: 1 });
+  assert.equal(rejected, 400); assert.match(why.error, /Expected an object|Untrusted signing key|Pinned/, 'an unpinned signer without a certificate is final, not retried');
+  void quote;
+});

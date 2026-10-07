@@ -32,6 +32,19 @@ function rpcFor(terms, requested, deps) {
   if (u.protocol !== 'https:' || PRIVATE_HOST.test(u.hostname)) throw new Error('RPC URL must be a public HTTPS endpoint');
   return jsonRpc(url, deps?.fetchImpl ?? fetch);
 }
+/** A payment verified seconds after settlement often has 1 confirmation or an RPC that has not indexed the receipt yet.
+ *  Those are transient, so retry them for a bounded time; every other failure is final. */
+const TRANSIENT = /Insufficient confirmations|Expected an object|RPC HTTP failure|RPC response too large|Invalid RPC response|No RPC body|fetch failed|aborted/i;
+async function settleWithPatience(call, terms, rpc, deps) {
+  const attempts = deps.settleAttempts ?? 6, delayMs = deps.settleDelayMs ?? 2500;
+  for (let i = 1; ; i++) {
+    try { return await verifySettlement(call, terms, rpc, 2); }
+    catch (err) {
+      if (i >= attempts || !(err instanceof Error) || !TRANSIENT.test(err.message)) throw err;
+      await new Promise(r => setTimeout(r, delayMs));
+    }
+  }
+}
 function callOf(value) {
   const c = object(value);
   return { id: String(c.id ?? ''), sessionId: String(c.sessionId ?? ''), requestKey: String(c.requestKey ?? ''), requestHash: String(c.requestHash ?? ''), input: object(c.input), quote: object(c.quote), amount: atomic(c.amount).toString(), nonce: hash32(c.nonce), createdAt: Number(c.createdAt), state: String(c.state ?? ''), prepared: c.prepared ? object(c.prepared) : null, wire: c.wire ? object(c.wire) : null, verified: null };
@@ -84,7 +97,7 @@ export async function handle(method, path, rawBody, deps = {}) {
       const p = resolveProvider(body.provider), terms = object(body.terms), call = callOf(body.call), pins = pinsOf(body.pins);
       validateTerms(terms, p);
       const receipt = await verifyReceipt(call, terms, pins, p);
-      const ledger = await verifySettlement(call, terms, rpcFor(terms, body.rpcUrl, deps), 2);
+      const ledger = await settleWithPatience(call, terms, rpcFor(terms, body.rpcUrl, deps), deps);
       return [200, { verified: { receipt, ledger, semanticCorrectness: 'not-verified' } }];
     }
     if (path === '/api/archive/verify') {

@@ -40,7 +40,7 @@ async function terms(args) {
   return { profile: PROFILE, payer: run.wallet.address, provider: p.payTo, network: p.network, asset: p.asset.address, endpoint: `${p.origin}${p.endpointPath}`, maxTotal, maxPerCall, maxCalls, expiresAt: Date.now() + ttl * 1000, license: { uri: 'urn:alsp:agent:locally-reviewed-terms', sha256: await sha256Text(String(args.licenseNote)), acceptance: 'buyer-only' } };
 }
 const summary = async id => { const r = await run.journal.export(id); const s = run.journal.session(id); return { state: s.state === 'ACTIVE' ? 'ACTIVE' : r.summary.state, allocated: r.summary.allocatedTotal, verifiedSpent: r.summary.verifiedSpent, unresolved: r.summary.unresolved, calls: r.summary.calls, maxCalls: s.terms.maxCalls, remainingBudget: (BigInt(s.terms.maxTotal) - BigInt(r.summary.allocatedTotal)).toString(), events: r.events.length, head: r.headHash }; };
-const callView = c => ({ callId: c.id, key: c.requestKey, input: c.input, state: c.state, amount: c.amount, hasStoredResponse: Boolean(c.wire), tx: c.verified?.ledger.transaction ?? null, receiptId: c.verified?.receipt.requestId ?? null, response: c.state === 'VERIFIED' ? (({ receipt: _r, ...rest }) => rest)(c.wire.body) : null });
+const callView = c => ({ callId: c.id, key: c.requestKey, input: c.input, state: c.state, amount: c.amount, hasStoredResponse: Boolean(c.wire), lastError: c.state === 'VERIFIED' ? null : (run.errors.get(c.id) ?? null), tx: c.verified?.ledger.transaction ?? null, receiptId: c.verified?.receipt.requestId ?? null, response: c.state === 'VERIFIED' ? (({ receipt: _r, ...rest }) => rest)(c.wire.body) : null });
 
 const TOOL_IMPL = {
   async probe_quote({ input }) {
@@ -60,7 +60,7 @@ const TOOL_IMPL = {
   async call({ key, input }) {
     if (!run.sessionId) throw new Error('Create a session first');
     const c = await run.client.call(run.sessionId, key, input);
-    return { ...callView(c), note: c.state === 'VERIFIED' ? 'Paid and verified.' : c.wire ? 'Response stored but verification failed. Use reconcile with recover=false to re-verify.' : 'No response was captured; the payment may or may not have settled. Use reconcile with recover=true. Never retry with a new key.' };
+    return { ...callView(c), note: c.state === 'VERIFIED' ? 'Paid and verified.' : c.wire ? 'Response stored but verification failed (see lastError). If it looks transient (confirmations, RPC), reconcile with recover=false; if the receipt or signer is rejected, it will never verify.' : 'No response was captured; the payment may or may not have settled. Use reconcile with recover=true. Never retry with a new key.' };
   },
   async reconcile({ callId, recover }) {
     const c = run.journal.call(callId);
@@ -112,9 +112,9 @@ async function start() {
     const pin = $('#pin').value.trim(); if (!pin) { log('<b>Enter the receipt signer pin</b> you verified independently.', 'bad'); return; }
     provider = currentProviderJson(); providerWire = provider.id === 'x402-doctor' ? { id: provider.id } : provider; pins = [{ address: pin }]; rpcUrl = $('#rpcUrl').value.trim() || undefined; w = wallet; a = api;
   }
-  const onStep = (step, c, err) => { if (step === 'error') log(`<span class="muted">journal:</span> ${esc(err.message)} → RECONCILIATION_REQUIRED`, 'warn'); else if (step === 'reserved') log(`<span class="muted">journal:</span> reserved ${usdc(c.amount)} · nonce ${short(c.nonce)} · asking wallet to sign`, 'muted'); else if (step === 'submitting') log('<span class="muted">journal:</span> submission intent committed → sending once', 'muted'); renderJournal(); };
+  const onStep = (step, c, err) => { if (step === 'error') { if (c) run.errors.set(c.id, err.message); log(`<span class="muted">journal:</span> ${esc(err.message)} → RECONCILIATION_REQUIRED`, 'warn'); } else if (step === 'reserved') log(`<span class="muted">journal:</span> reserved ${usdc(c.amount)} · nonce ${short(c.nonce)} · asking wallet to sign`, 'muted'); else if (step === 'submitting') log('<span class="muted">journal:</span> submission intent committed → sending once', 'muted'); renderJournal(); };
   const noPayments = async () => { throw new Error('Reconciliation cannot create or send a payment'); };
-  run = { journal, sim, provider, providerWire, pins, rpcUrl, wallet: w, api: a, recover, sessionId: null, messages: [], stopped: false, done: false, turns: 0, tokens: 0, archive: null,
+  run = { journal, sim, provider, providerWire, pins, rpcUrl, wallet: w, api: a, recover, sessionId: null, messages: [], stopped: false, done: false, turns: 0, tokens: 0, archive: null, errors: new Map(),
     client: new BrowserSessionClient(journal, { api: a, wallet: w, pins, rpcUrl, onStep }),
     reconciler: new BrowserSessionClient(journal, { api: { ...a, probe: noPayments, send: noPayments }, wallet: { address: w.address, prepare: noPayments }, pins, rpcUrl, onStep }) };
   const c = caps();
