@@ -50,20 +50,54 @@ export const inputOf = (value, provider) => (provider.id === 'x402-doctor' ? doc
 
 // ---------- journal ----------
 const KEY = 'alsp:v1';
+const LOCK = `${KEY}:write`;
 const empty = () => ({ sessions: {}, receipts: {}, payments: {} });
+let localWriteQueue = Promise.resolve();
 export class BrowserJournal {
-  constructor(storage = globalThis.localStorage) { this.storage = storage; }
-  load() { try { const raw = this.storage.getItem(KEY); return raw ? JSON.parse(raw) : empty(); } catch { return empty(); } }
+  constructor(storage = globalThis.localStorage, locks = globalThis.navigator?.locks) { this.storage = storage; this.locks = locks; }
+  load() {
+    let raw;
+    try { raw = this.storage.getItem(KEY); } catch (cause) { throw new Error('Journal storage is unavailable; refusing to continue without payment history', { cause }); }
+    if (raw === null || raw === undefined) return empty();
+    let db;
+    try { if (typeof raw !== 'string') throw new Error('Storage value is not text'); db = JSON.parse(raw); } catch (cause) { throw new Error('Journal data is corrupted; refusing to continue without payment history', { cause }); }
+    const record = value => value && typeof value === 'object' && !Array.isArray(value) && [Object.prototype, null].includes(Object.getPrototypeOf(value));
+    if (!record(db) || !record(db.sessions) || !record(db.receipts) || !record(db.payments)) {
+      throw new Error('Journal data is invalid; refusing to continue without payment history');
+    }
+    for (const [id, s] of Object.entries(db.sessions)) {
+      if (!record(s) || s.id !== id || !record(s.terms) || !record(s.provider) || !['ACTIVE', 'ENDED'].includes(s.state) || typeof s.head !== 'string' || !Number.isSafeInteger(s.seq) || s.seq < 0 || !Number.isFinite(s.createdAt) || !Array.isArray(s.events) || !Array.isArray(s.calls) || s.seq !== s.events.length) {
+        throw new Error('Journal data is invalid; refusing to continue without payment history');
+      }
+      for (const c of s.calls) if (!record(c) || c.sessionId !== id || typeof c.id !== 'string' || typeof c.requestKey !== 'string' || typeof c.requestHash !== 'string' || !['RESERVED', 'AUTHORIZED', 'SUBMITTED', 'RECONCILIATION_REQUIRED', 'VERIFIED'].includes(c.state)) {
+        throw new Error('Journal data is invalid; refusing to continue without payment history');
+      }
+    }
+    return db;
+  }
   save(db) { this.storage.setItem(KEY, JSON.stringify(db)); }
+  async withWriteLock(fn) {
+    if (this.locks?.request) return this.locks.request(LOCK, { mode: 'exclusive' }, fn);
+    // Node-based demos have no browser tabs. In browsers, never silently fall back to an
+    // in-memory mutex: it would not coordinate other tabs sharing localStorage.
+    if (globalThis.navigator) throw new Error('Browser reservation lock unavailable; refusing journal write');
+    const previous = localWriteQueue;
+    let release;
+    localWriteQueue = new Promise(resolve => { release = resolve; });
+    await previous;
+    try { return await fn(); } finally { release(); }
+  }
   list() { return Object.values(this.load().sessions).sort((a, b) => b.createdAt - a.createdAt).map(s => ({ id: s.id, state: s.state, createdAt: s.createdAt, providerId: s.provider.id, payer: s.terms.payer, calls: s.calls.length, unresolved: s.calls.filter(c => c.state !== 'VERIFIED').length })); }
   session(id, db = this.load()) { const s = db.sessions[id]; if (!s) throw new Error('Unknown session'); return s; }
   calls(id) { return this.session(id).calls; }
   call(id, db = this.load()) { for (const s of Object.values(db.sessions)) { const c = s.calls.find(c => c.id === id); if (c) return c; } throw new Error('Unknown call'); }
   async create(terms, provider, now = Date.now()) {
     if (terms.expiresAt <= now) throw new Error('Session already expired');
-    const db = this.load(), id = crypto.randomUUID();
-    db.sessions[id] = { id, terms, provider, state: 'ACTIVE', head: await digest({ profile: PROFILE, sessionId: id, terms }), seq: 0, createdAt: now, events: [], calls: [] };
-    this.save(db); return id;
+    return this.withWriteLock(async () => {
+      const db = this.load(), id = crypto.randomUUID();
+      db.sessions[id] = { id, terms, provider, state: 'ACTIVE', head: await digest({ profile: PROFILE, sessionId: id, terms }), seq: 0, createdAt: now, events: [], calls: [] };
+      this.save(db); return id;
+    });
   }
   async append(s, event) {
     const seq = s.seq + 1, head = await digest({ profile: PROFILE, sessionId: s.id, seq, previous: s.head, event });
@@ -78,24 +112,29 @@ export class BrowserJournal {
     return c;
   }
   async reserve(sessionId, key, input, quote, now = Date.now()) {
-    const old = await this.find(sessionId, key, input);
-    if (old) return { call: old, created: false };
-    const db = this.load(), s = this.session(sessionId, db), amount = atomic(quote.accepted.amount);
-    if (s.state !== 'ACTIVE' || now >= s.terms.expiresAt) throw new Error('Session not active');
-    if (amount <= 0n || amount > atomic(s.terms.maxPerCall) || s.calls.length >= s.terms.maxCalls) throw new Error('Per-call policy exceeded');
-    if (s.calls.reduce((sum, c) => sum + atomic(c.amount), 0n) + amount > atomic(s.terms.maxTotal)) throw new Error('Session budget exceeded');
-    const nonce = randomNonce(), paymentId = `${s.terms.network}:${s.terms.asset.toLowerCase()}:${s.terms.payer.toLowerCase()}:${nonce}`;
-    if (db.payments[paymentId]) throw new Error('Nonce collision');
-    const c = { id: crypto.randomUUID(), sessionId, requestKey: key, requestHash: await digest({ endpoint: s.terms.endpoint, input: inputOf(input, s.provider) }), input, quote, amount: amount.toString(), nonce, createdAt: now, state: 'RESERVED', prepared: null, wire: null, verified: null };
-    s.calls.push(c); db.payments[paymentId] = c.id;
-    await this.append(s, { kind: 'reserved', callId: c.id, requestKey: key, requestHash: c.requestHash, amount: c.amount, nonce });
-    this.save(db); return { call: c, created: true };
+    return this.withWriteLock(async () => {
+      // Recheck after acquiring the origin-wide lock; find() outside the lock is only a hint.
+      const old = await this.find(sessionId, key, input);
+      if (old) return { call: old, created: false };
+      const db = this.load(), s = this.session(sessionId, db), amount = atomic(quote.accepted.amount);
+      if (s.state !== 'ACTIVE' || now >= s.terms.expiresAt) throw new Error('Session not active');
+      if (amount <= 0n || amount > atomic(s.terms.maxPerCall) || s.calls.length >= s.terms.maxCalls) throw new Error('Per-call policy exceeded');
+      if (s.calls.reduce((sum, c) => sum + atomic(c.amount), 0n) + amount > atomic(s.terms.maxTotal)) throw new Error('Session budget exceeded');
+      const nonce = randomNonce(), paymentId = `${s.terms.network}:${s.terms.asset.toLowerCase()}:${s.terms.payer.toLowerCase()}:${nonce}`;
+      if (db.payments[paymentId]) throw new Error('Nonce collision');
+      const c = { id: crypto.randomUUID(), sessionId, requestKey: key, requestHash: await digest({ endpoint: s.terms.endpoint, input: inputOf(input, s.provider) }), input, quote, amount: amount.toString(), nonce, createdAt: now, state: 'RESERVED', prepared: null, wire: null, verified: null };
+      s.calls.push(c); db.payments[paymentId] = c.id;
+      await this.append(s, { kind: 'reserved', callId: c.id, requestKey: key, requestHash: c.requestHash, amount: c.amount, nonce });
+      this.save(db); return { call: c, created: true };
+    });
   }
   async update(callId, fn) {
-    const db = this.load(), c = this.call(callId, db), s = this.session(c.sessionId, db);
-    const event = await fn(c, s, db);
-    if (event) await this.append(s, event);
-    this.save(db); return c;
+    return this.withWriteLock(async () => {
+      const db = this.load(), c = this.call(callId, db), s = this.session(c.sessionId, db);
+      const event = await fn(c, s, db);
+      if (event) await this.append(s, event);
+      this.save(db); return c;
+    });
   }
   prepared(id, prepared) { return this.update(id, async c => { if (c.state !== 'RESERVED') throw new Error('Already authorized'); c.prepared = prepared; c.state = 'AUTHORIZED'; return { kind: 'authorized', callId: id, paymentHash: await digest(prepared) }; }); }
   submitted(id, now = Date.now()) { return this.update(id, async (c, s) => { if (c.state !== 'AUTHORIZED' || !c.prepared || s.state !== 'ACTIVE' || now >= s.terms.expiresAt) throw new Error('Cannot submit'); c.state = 'SUBMITTED'; return { kind: 'submission_intent', callId: id }; }); }
@@ -112,18 +151,22 @@ export class BrowserJournal {
     db.receipts[receiptId] = id; c.verified = proof; c.state = 'VERIFIED';
     return { kind: 'verified', callId: id, amount: c.amount, proof }; }); }
   async resume(sessionId, now = Date.now()) {
-    const db = this.load(), s = this.session(sessionId, db);
-    if (s.state === 'ACTIVE') return;
-    if (now >= s.terms.expiresAt) throw new Error('Session expired');
-    if (s.calls.some(c => c.state !== 'VERIFIED')) throw new Error('Unresolved call prevents resume');
-    if (s.calls.length >= s.terms.maxCalls) throw new Error('Session call limit reached');
-    if (s.calls.reduce((sum, c) => sum + atomic(c.amount), 0n) >= atomic(s.terms.maxTotal)) throw new Error('Session budget exhausted');
-    s.state = 'ACTIVE'; await this.append(s, { kind: 'access_resumed', reason: 'continue_after_reconciliation' }); this.save(db);
+    return this.withWriteLock(async () => {
+      const db = this.load(), s = this.session(sessionId, db);
+      if (s.state === 'ACTIVE') return;
+      if (now >= s.terms.expiresAt) throw new Error('Session expired');
+      if (s.calls.some(c => c.state !== 'VERIFIED')) throw new Error('Unresolved call prevents resume');
+      if (s.calls.length >= s.terms.maxCalls) throw new Error('Session call limit reached');
+      if (s.calls.reduce((sum, c) => sum + atomic(c.amount), 0n) >= atomic(s.terms.maxTotal)) throw new Error('Session budget exhausted');
+      s.state = 'ACTIVE'; await this.append(s, { kind: 'access_resumed', reason: 'continue_after_reconciliation' }); this.save(db);
+    });
   }
   async end(sessionId) {
-    const db = this.load(), s = this.session(sessionId, db);
-    if (s.state !== 'ACTIVE') return;
-    s.state = 'ENDED'; await this.append(s, { kind: 'access_ended' }); this.save(db);
+    return this.withWriteLock(async () => {
+      const db = this.load(), s = this.session(sessionId, db);
+      if (s.state !== 'ACTIVE') return;
+      s.state = 'ENDED'; await this.append(s, { kind: 'access_ended' }); this.save(db);
+    });
   }
   async export(sessionId) {
     const s = this.session(sessionId), calls = s.calls, sum = list => list.reduce((t, c) => t + atomic(c.amount), 0n).toString();
@@ -133,9 +176,11 @@ export class BrowserJournal {
   }
   /** Permanently deletes a session's local record. Refuses while any call is unresolved. */
   forget(sessionId) {
-    const db = this.load(), s = this.session(sessionId, db);
-    if (s.calls.some(c => c.state !== 'VERIFIED')) throw new Error('Refusing to delete a journal with unresolved payments');
-    delete db.sessions[sessionId]; this.save(db);
+    return this.withWriteLock(async () => {
+      const db = this.load(), s = this.session(sessionId, db);
+      if (s.calls.some(c => c.state !== 'VERIFIED')) throw new Error('Refusing to delete a journal with unresolved payments');
+      delete db.sessions[sessionId]; this.save(db);
+    });
   }
 }
 /** Same chain rule as the library's verifyChain, for a local self-check. */
