@@ -158,7 +158,14 @@ ALSP does not:
 
 ## Implementation evidence
 
-The repository's `main` baseline contains a runnable buyer-side reference implementation and local tests. Those tests exercise real EIP-191/EIP-712 signatures and a local HTTP provider, but use **mock ledger evidence**. The free `doctor:probe` checks the live public 402 challenge and signer metadata without paying. No paid mainnet interoperability run is claimed by this baseline. A future run must be reported with its evidence and limitations in a separately reviewed update.
+The current `main` contains a runnable buyer-side reference and browser client. Validation levels are distinct:
+
+- **Local / mocked ledger:** EIP-191/EIP-712 signatures and local HTTP provider tests use **mock ledger evidence**.
+- **Free probe:** `doctor:probe` checks the public 402 challenge and signer metadata without paying; it does not verify paid settlement.
+- **Buyer-side live Base/USDC:** [PR #7](https://github.com/Kairose-master/ALSP/pull/7) records three ordinary x402 `exact` payments in one bounded ALSP session, independent settlement verification for all three, reconciliation of uncertain outcomes without replacement payments, and closure with zero unresolved calls, without additional registry transactions.
+- **Browser tests:** [PR #9](https://github.com/Kairose-master/ALSP/pull/9) adds the client/stateless proxy; `test/demo.test.mjs` uses Node, a mock provider/ledger and fixture signatures to test replay, reconciliation and archive verification. [PR #10](https://github.com/Kairose-master/ALSP/pull/10) adds fail-closed storage handling and serialized-reservation regressions using an injected shared lock manager. This does not establish browser mainnet settlement or actual multi-tab browser verification.
+
+Provider-side cross-check of the paid run remains pending. Buyer-side terms commitments and archive seals do not establish provider assent or fully verified bilateral interoperability. The proposal has not been established as an adopted x402 standard. See the [validation record and limitations](INTEROP-001.md#validation-record-as-of-2026-10-08).
 
 ## Relationship to x402 core
 
