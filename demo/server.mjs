@@ -13,7 +13,7 @@ const server = createServer(async (req, res) => {
   if (url.pathname.startsWith('/api/')) {
     let body = '';
     for await (const chunk of req) { body += chunk; if (body.length > 65536) break; }
-    const [status, payload] = await handle(req.method, url.pathname, body);
+    const [status, payload] = await handle(req.method, url.pathname, body, { query: url.search.slice(1) });
     res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
     res.end(JSON.stringify(payload));
     return;

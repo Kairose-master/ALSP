@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>Run Logs</title>
+<meta name="description" content="Every agent run, measurement and exported archive from this deployment, in one place.">
+<style>
+:root{--bg:#f6f7f9;--panel:#fff;--ink:#17202a;--muted:#5b6672;--line:#dfe3e8;--accent:#2457d6;--ok:#1d8a4b;--bad:#c23b3b;--warn:#b7791f;--chip:#eef1f5;--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#0f1216;--panel:#171b21;--ink:#e8ecf1;--muted:#98a2ad;--line:#2a313a;--accent:#7aa2ff;--ok:#4cc38a;--bad:#ff6b6b;--warn:#e2b14a;--chip:#222831}}
+:root[data-theme=dark]{--bg:#0f1216;--panel:#171b21;--ink:#e8ecf1;--muted:#98a2ad;--line:#2a313a;--accent:#7aa2ff;--ok:#4cc38a;--bad:#ff6b6b;--warn:#e2b14a;--chip:#222831}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+header{padding:20px 16px 8px;max-width:1320px;margin:0 auto;display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between}
+h1{font-size:20px;margin:0}header p{margin:4px 0 0;color:var(--muted);font-size:14px;max-width:760px}
+.badge{display:inline-block;font-size:12px;padding:2px 8px;border-radius:999px;background:var(--chip);color:var(--muted);margin-left:8px;vertical-align:middle}
+main{max-width:1320px;margin:0 auto;padding:8px 16px 48px;display:grid;grid-template-columns:460px 1fr;gap:16px}
+@media (max-width:960px){main{grid-template-columns:1fr}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:16px}
+.panel h2{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0 0 10px}
+button{cursor:pointer;border:1px solid var(--line);background:var(--chip);color:var(--ink);padding:6px 10px;border-radius:8px;font:inherit}button.on{border-color:var(--accent);color:var(--accent)}
+.filters{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.entry{display:block;width:100%;text-align:left;padding:8px 10px;margin-bottom:6px;line-height:1.35}.entry.active{border-color:var(--accent)}.entry small{color:var(--muted)}
+.kind{font:11px var(--mono);padding:1px 6px;border-radius:6px;background:var(--chip);margin-right:6px}
+.strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-bottom:10px}
+.tile{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:8px 10px}.tile .k{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}.tile .v{font-size:16px;font-weight:600;font-variant-numeric:tabular-nums}
+table{width:100%;border-collapse:collapse;font-size:13px}th,td{text-align:left;padding:5px 6px;border-top:1px solid var(--line);vertical-align:top}th{color:var(--muted);font-weight:500;border-top:0}
+code,.mono{font:12px var(--mono);word-break:break-all}.muted{color:var(--muted)}.ok{color:var(--ok)}.bad{color:var(--bad)}.warn{color:var(--warn)}
+pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px;overflow:auto;font:12px var(--mono);max-height:480px;white-space:pre-wrap;margin:8px 0 0}
+details{margin-top:12px}summary{cursor:pointer;color:var(--muted);font-size:13px}.empty{color:var(--muted);padding:20px 0;text-align:center}
+.transcript div{padding:4px 0;border-top:1px solid var(--line);font-size:13px}.transcript .agent{background:var(--chip);border-radius:8px;padding:8px 10px;border-top:0;margin:4px 0}
+a{color:var(--accent)}
+</style>
+</head>
+<body>
+<header>
+  <div><h1>Run logs <span class="badge" id="status">loading…</span></h1><p>Every agent run, measurement and exported archive published from this deployment. Click an entry to inspect it.</p></div>
+  <div style="display:flex;gap:8px"><a href="./agent.html"><button>Agent</button></a><a href="./measure.html"><button>Measure</button></a><a href="./"><button>Client</button></a></div>
+</header>
+<main>
+  <section class="panel"><h2>Entries</h2><div class="filters" id="filters"></div><div id="list"><div class="empty">Loading…</div></div></section>
+  <section class="panel"><h2>Detail</h2><div id="detail"><div class="empty">Select an entry.</div></div></section>
+</main>
+<script type="module" src="./logs.js"></script>
+</body>
+</html>

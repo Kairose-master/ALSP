@@ -3,7 +3,8 @@
 // fetch the 402 challenge, forward one signed payment, verify receipts/settlement, verify archives.
 // It never stores keys, authorizations or responses.
 import { agentEnabled, agentTurn, MODEL as AGENT_MODEL } from './agent.mjs';
-import { TEMPLATES, discoverProvider } from './discover.mjs';
+import { PRODUCTS, TEMPLATES, discoverProvider } from './discover.mjs';
+import { getLog, listLogs, logsBackend, logsEnabled, putLog } from './logs.mjs';
 import { DOCTOR_PROVIDER, PROFILE, address, atomic, boundedFetch, canonical, chainIdOf, defineProvider, digest, hash32, jsonRpc, object, providerJson, requestUrl, selectQuote, validatePrepared, validateTerms, verifyBuyerSeal, verifyChain, verifyReceipt, verifySettlement, x402Transport } from '../dist/index.js';
 
 const MAX_BODY = 512 * 1024;
@@ -59,12 +60,18 @@ export async function handle(method, path, rawBody, deps = {}) {
   const fetchImpl = deps.fetchImpl ?? fetch, transport = p => x402Transport(p, fetchImpl);
   try {
     if (method === 'GET' && path === '/api/meta') {
-      return [200, { profile: PROFILE, presets: Object.fromEntries(Object.values(PRESETS).map(p => [p.id, providerJson(p)])), defaultRpc: DEFAULT_RPC, allowedOrigins: allowedOrigins(), interopTarget: 'https://ichimoku-signal.fizzl.eu/signal/BTC-USDT', templates: TEMPLATES, agent: { enabled: agentEnabled(), model: AGENT_MODEL } }];
+      return [200, { profile: PROFILE, presets: Object.fromEntries(Object.values(PRESETS).map(p => [p.id, providerJson(p)])), defaultRpc: DEFAULT_RPC, allowedOrigins: allowedOrigins(), interopTarget: 'https://ichimoku-signal.fizzl.eu/signal/BTC-USDT', templates: TEMPLATES, products: PRODUCTS, agent: { enabled: agentEnabled(), model: AGENT_MODEL }, logs: { enabled: logsEnabled(), backend: logsBackend() } }];
     }
+    if (method === 'GET' && path === '/api/logs') return [200, await listLogs(Number(new URLSearchParams(deps.query ?? '').get('limit') ?? 100))];
+    if (method === 'GET' && path.startsWith('/api/logs/')) return [200, await getLog(decodeURIComponent(path.slice('/api/logs/'.length)))];
     if (method !== 'POST') return [404, { error: 'Not found' }];
     if (rawBody && rawBody.length > MAX_BODY) return [413, { error: 'Request too large' }];
     const body = object(rawBody ? JSON.parse(rawBody) : {});
 
+    if (path === '/api/logs') {
+      if (process.env.ALSP_LOG_TOKEN && body.token !== process.env.ALSP_LOG_TOKEN) return [403, { error: 'Log token required' }];
+      return [200, await putLog(body)];
+    }
     if (path === '/api/agent/turn') return agentTurn(body, deps.agent ?? {});
     if (path === '/api/x402/discover') {
       // Unpaid: build a provider profile from a resource's own 402. The caller still reviews payTo before paying.

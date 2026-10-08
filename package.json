@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.131.0",
+    "@vercel/blob": "^2.8.1",
     "viem": "2.56.8"
   },
   "devDependencies": {

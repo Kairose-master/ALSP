@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="icon" href="data:,">
-<title>Agent Session Run</title>
-<meta name="description" content="Watch an AI agent run a complete ALSP x402 session end to end: terms, budgeted paid calls, a failure, reconciliation, export and report. Sandbox or live with your wallet.">
+<title>Agent Mission Run</title>
+<meta name="description" content="Watch an AI agent run a complete ALSP mission end to end: one spend cap across several paid providers, budgeted calls, a failure, reconciliation, export and report. Sandbox or live with your wallet.">
 <style>
 :root{--bg:#f6f7f9;--panel:#fff;--ink:#17202a;--muted:#5b6672;--line:#dfe3e8;--accent:#2457d6;--ok:#1d8a4b;--bad:#c23b3b;--warn:#b7791f;--chip:#eef1f5;--agent:#eef3ff;--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
 @media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#0f1216;--panel:#171b21;--ink:#e8ecf1;--muted:#98a2ad;--line:#2a313a;--accent:#7aa2ff;--ok:#4cc38a;--bad:#ff6b6b;--warn:#e2b14a;--chip:#222831;--agent:#1b2436}}
@@ -19,6 +19,7 @@ main{max-width:1320px;margin:0 auto;padding:8px 16px 48px;display:grid;grid-temp
 @media (max-width:760px){main{grid-template-columns:1fr}}
 .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:16px}
 .panel h2{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0 0 10px}
+h3{font-size:14px;margin:12px 0 6px}
 label{display:block;font-size:12px;color:var(--muted);margin:10px 0 4px}
 input,select,textarea{width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font:inherit}
 textarea{resize:vertical}textarea.code{font:12px var(--mono)}
@@ -26,7 +27,7 @@ textarea{resize:vertical}textarea.code{font:12px var(--mono)}
 button{cursor:pointer;border:1px solid var(--line);background:var(--chip);color:var(--ink);padding:8px 12px;border-radius:8px;font:inherit}
 button.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}button:disabled{opacity:.5;cursor:not-allowed}
 .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.hint{font-size:12px;color:var(--muted);margin:8px 0 0}.muted{color:var(--muted)}
-.modes{display:flex;gap:12px;font-size:14px}.modes label{display:flex;gap:6px;align-items:center;margin:0;color:var(--ink)}.modes input{width:auto}
+.modes{display:flex;gap:12px;font-size:14px;flex-wrap:wrap}.modes label{display:flex;gap:6px;align-items:center;margin:0;color:var(--ink)}.modes input{width:auto}
 body[data-mode=sandbox] .live-only{display:none}
 .sw{border:1px dashed var(--line);border-radius:10px;padding:10px;margin-top:8px;font-size:13px}.sw .sw-addr,.sw .sw-bal{margin-bottom:6px}.sw input{width:auto}
 #transcript{min-height:300px;max-height:72vh;overflow:auto;display:flex;flex-direction:column;gap:8px}
@@ -45,28 +46,33 @@ code,.mono{font:11px var(--mono);word-break:break-all}pre{background:var(--bg);b
 .empty{color:var(--muted);padding:16px 0;text-align:center}a{color:var(--accent)}
 #stats{font-size:12px;color:var(--muted)}
 .cmp td.good{color:var(--ok);font-weight:600}.cmp td.badc{color:var(--bad);font-weight:600}.cmp th:first-child{width:38%}
+.plist{list-style:none;padding:0;margin:0}.plist li{font-size:13px;margin:4px 0;display:flex;gap:6px;align-items:baseline}.plist code{font:11px var(--mono)}.plist button{padding:2px 6px;font-size:11px}
 </style>
 </head>
 <body data-mode="sandbox">
 <header>
   <div>
-    <h1>Agent session run <span class="badge" id="agentInfo">loading…</span></h1>
-    <p>An AI agent gets a mission and hard caps, then runs the whole session itself: terms, budgeted paid calls, a failure, reconciliation, export and report. Every tool executes in your browser on the real journal; the model only decides.</p>
+    <h1>Agent mission run <span class="badge" id="agentInfo">loading…</span></h1>
+    <p>An AI agent gets a mission, a spend cap and a set of paid providers, then runs everything itself: one session per provider under one cap, budgeted calls, a failure, reconciliation, export and report. Every tool executes in your browser on the real journal; the model only decides.</p>
   </div>
-  <div style="display:flex;gap:8px"><a href="./learn.html"><button>What is a session?</button></a><a href="./"><button>Real client →</button></a></div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap"><a href="./learn.html"><button>What is a session?</button></a><a href="./measure.html"><button>Measure</button></a><a href="./logs.html"><button>Logs</button></a><a href="./"><button>Client →</button></a></div>
 </header>
 <main>
   <div>
     <section class="panel">
       <h2>Mission</h2>
       <div class="modes"><label><input type="radio" name="mode" value="sandbox" checked> Sandbox (simulated, free)</label><label><input type="radio" name="mode" value="live"> Live (real USDC)</label></div>
+      <label>Product</label>
+      <select id="product"></select>
+      <p class="hint" id="productNote"></p>
       <label>What the agent should accomplish</label>
-      <textarea id="mission" rows="6"></textarea>
-      <label>Hard caps the agent cannot exceed (atomic USDC)</label>
-      <div class="row3"><input id="maxTotal" value="5000" title="maxTotal"><input id="maxPerCall" value="1000" title="maxPerCall"><input id="maxCalls" type="number" min="1" max="20" value="5" title="maxCalls"></div>
-      <p class="hint">total · per call · max calls. The default product is a 5-day BTC price history: five payments to one provider under one cap, one per day of history. In Sandbox the provider drops the response of the 2nd paid call after settling it; when the agent finishes, the same product is replayed without ALSP so you can compare.</p>
+      <textarea id="mission" rows="7"></textarea>
+      <label>Mission cap and per-session limits the agent cannot exceed (atomic USDC)</label>
+      <div class="row3"><input id="maxTotal" value="5000" title="mission maxTotal"><input id="maxPerCall" value="2000" title="maxPerCall"><input id="maxCalls" type="number" min="1" max="50" value="6" title="maxCalls per session"></div>
+      <p class="hint">mission total · per call · max calls per session. In Sandbox the candle provider drops its first response after settling it; when the agent finishes, the same product is replayed without ALSP so you can compare.</p>
       <div class="actions"><button class="primary" id="start">▶ Run agent</button><button id="stop" disabled>■ Stop</button><button id="download" disabled>Download archive</button></div>
       <p id="stats" class="hint"></p>
+      <p id="logLink" class="hint"></p>
     </section>
     <section class="panel live-only">
       <h2>Live settings</h2>
@@ -74,22 +80,20 @@ code,.mono{font:11px var(--mono);word-break:break-all}pre{background:var(--bg);b
       <label>Who pays</label>
       <div class="modes"><label><input type="radio" name="payer" value="injected" checked> Connected wallet (signs every payment)</label><label><input type="radio" name="payer" value="session"> Disposable session wallet (agent signs itself)</label></div>
       <div id="sessionWalletBox" class="sw" hidden></div>
-      <label>Provider</label><select id="preset"></select>
-      <div id="discoverRow" class="actions" style="margin-top:8px" hidden><input id="discoverUrl" placeholder="https://provider.example/paid?x=1" style="flex:1;min-width:160px"><button id="discoverBtn">Discover from 402</button></div>
-      <p class="hint" id="providerNote"></p>
-      <label>Provider profile JSON</label><textarea id="providerJson" class="code" rows="8"></textarea>
-      <label>Request parameters the agent starts from (JSON)</label><textarea id="input" class="code" rows="2"></textarea>
-      <div class="actions"><button id="fetchSigner">Fetch published signer</button><button id="usePublishedSigner">Use as pin</button></div><pre id="signerDoc" class="muted"></pre>
-      <label>Receipt signer pin (signed-receipt providers only)</label><input id="pin" placeholder="0x…">
+      <h3>Providers in this mission</h3>
+      <ul class="plist" id="providerList"><li class="muted">Pick a product above, or add a provider below.</li></ul>
+      <label>Add a provider (any x402 URL, discovered from its 402)</label>
+      <div class="actions" style="margin-top:0"><input id="discoverUrl" placeholder="https://provider.example/paid?x=1" style="flex:1;min-width:160px"><input id="discoverRole" placeholder="role id" style="width:90px"><button id="discoverBtn">Add</button></div>
+      <label>Receipt signer pin (only for signed-receipt providers such as Doctor)</label><input id="pin" placeholder="0x…">
       <label>Read-only RPC URL</label><input id="rpcUrl">
-      <p class="hint">The agent proposes the terms; you confirm them once, then sign each payment in your wallet. It cannot exceed the hard caps above.</p>
+      <p class="hint">The agent proposes each session's terms; you confirm once per provider, then payments are signed by the chosen payer. It cannot exceed the mission cap.</p>
     </section>
   </div>
   <div>
     <section class="panel"><h2>Agent transcript</h2><div id="transcript"><div class="empty">Press Run to start.</div></div></section>
-    <section class="panel" id="comparePanel" hidden><h2>Why a session: the same product without ALSP</h2><div id="compare"></div></section>
+    <section class="panel" id="comparePanel" hidden><h2>Why a mission: the same product without ALSP</h2><div id="compare"></div></section>
   </div>
-  <div class="right"><section class="panel"><h2>Journal (live)</h2><div id="journal"><div class="empty">No session yet.</div></div></section></div>
+  <div class="right"><section class="panel"><h2>Mission journal (live)</h2><div id="journal"><div class="empty">No mission yet.</div></div></section></div>
 </main>
 <script type="module" src="./agent.js"></script>
 </body>
