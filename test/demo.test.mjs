@@ -8,9 +8,19 @@ import { createMockProvider } from './mock-provider.mjs';
 // Public throwaway buyer key. MUST NEVER be funded.
 const BUYER_KEY = `0x${'11'.repeat(32)}`;
 const memoryStorage = () => { const m = new Map(); return { getItem: k => m.get(k) ?? null, setItem: (k, v) => m.set(k, String(v)) }; };
+function sharedLocks() {
+  const tails = new Map();
+  return { request(name, _options, callback) {
+    const previous = tails.get(name) ?? Promise.resolve();
+    let release;
+    const tail = new Promise(resolve => { release = resolve; });
+    tails.set(name, tail);
+    return previous.then(callback).finally(release);
+  } };
+}
 
 /** Drives the browser client exactly like app.js does, against the stateless handler and an in-process provider. */
-async function harness({ price = '1000', origin = 'https://oracle.example' } = {}) {
+async function harness({ price = '1000', origin = 'https://oracle.example', maxTotal = '3000', locks } = {}) {
   const mock = createMockProvider({ price, origin });
   const deps = { fetchImpl: mock.fetchImpl };
   const api = {
@@ -22,14 +32,39 @@ async function harness({ price = '1000', origin = 'https://oracle.example' } = {
   };
   const signer = evmSigner(BUYER_KEY);
   const wallet = { address: signer.address, prepare: signer.prepare, signMessage: signer.signManifest };
-  const journal = new BrowserJournal(memoryStorage());
+  const journal = new BrowserJournal(memoryStorage(), locks);
   const { profile } = mock, providerJson = JSON.parse(JSON.stringify(profile));
-  const terms = { profile: PROFILE, payer: signer.address, provider: profile.payTo, network: profile.network, asset: profile.asset.address, endpoint: `${profile.origin}${profile.endpointPath}`, maxTotal: '3000', maxPerCall: '1000', maxCalls: 3, expiresAt: Date.now() + 600000, license: { uri: 'urn:alsp:test', sha256: await sha256Text('reviewed fixture terms'), acceptance: 'buyer-only' } };
+  const terms = { profile: PROFILE, payer: signer.address, provider: profile.payTo, network: profile.network, asset: profile.asset.address, endpoint: `${profile.origin}${profile.endpointPath}`, maxTotal, maxPerCall: '1000', maxCalls: 3, expiresAt: Date.now() + 600000, license: { uri: 'urn:alsp:test', sha256: await sha256Text('reviewed fixture terms'), acceptance: 'buyer-only' } };
   const sessionId = await journal.create(terms, providerJson);
   const steps = [];
   const client = new BrowserSessionClient(journal, { api, wallet, pins: [{ address: mock.signer }], rpcUrl: `${origin}/rpc`, onStep: s => steps.push(s) });
   return { mock, api, journal, wallet, terms, sessionId, client, steps };
 }
+
+test('two BrowserJournal instances serialize reservations against the shared session budget', async () => {
+  const locks = sharedLocks(), h = await harness({ maxTotal: '1000', locks });
+  const second = new BrowserJournal(h.journal.storage, locks);
+  const quote = { accepted: { amount: '1000' } };
+  const results = await Promise.allSettled([
+    h.journal.reserve(h.sessionId, 'tab-a', { symbol: 'BTC-USDT' }, quote),
+    second.reserve(h.sessionId, 'tab-b', { symbol: 'ETH-USDT' }, quote),
+  ]);
+  assert.equal(results.filter(r => r.status === 'fulfilled').length, 1);
+  assert.equal(results.filter(r => r.status === 'rejected').length, 1);
+  assert.match(results.find(r => r.status === 'rejected').reason.message, /Session budget exceeded/);
+  assert.equal(h.journal.calls(h.sessionId).length, 1);
+  assert.equal((await h.journal.export(h.sessionId)).summary.allocatedTotal, '1000');
+});
+
+test('corrupt or inaccessible browser storage fails closed and is never treated as an empty journal', async () => {
+  const malformed = new BrowserJournal({ getItem: () => '{not json', setItem: () => { throw new Error('must not overwrite'); } });
+  assert.throws(() => malformed.load(), /Journal data is corrupted/);
+  assert.throws(() => malformed.list(), /Journal data is corrupted/);
+  const blocked = new BrowserJournal({ getItem: () => { throw new Error('storage blocked'); }, setItem: () => {} });
+  assert.throws(() => blocked.load(), /Journal storage is unavailable/);
+  const invalidShape = new BrowserJournal({ getItem: () => JSON.stringify({ sessions: {}, receipts: {} }), setItem: () => {} });
+  assert.throws(() => invalidShape.load(), /Journal data is invalid/);
+});
 
 test('browser journal + stateless proxy: two real signatures, one replay, archive verifies with the library', async () => {
   const h = await harness();
