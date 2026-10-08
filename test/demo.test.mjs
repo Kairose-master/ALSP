@@ -20,8 +20,8 @@ function sharedLocks() {
 }
 
 /** Drives the browser client exactly like app.js does, against the stateless handler and an in-process provider. */
-async function harness({ price = '1000', origin = 'https://oracle.example', maxTotal = '3000', locks = sharedLocks() } = {}) {
-  const mock = createMockProvider({ price, origin });
+async function harness({ price = '1000', origin = 'https://oracle.example', maxTotal = '3000', locks = sharedLocks() , receiptMode = 'signed' } = {}) {
+  const mock = createMockProvider({ price, origin , receiptMode });
   const deps = { fetchImpl: mock.fetchImpl };
   const api = {
     post: async (path, body) => { const [status, data] = await handle('POST', path, JSON.stringify(body), deps); if (status !== 200) throw new Error(data.error); return data; },
@@ -213,4 +213,32 @@ test('balance route reads balanceOf through the configured RPC', async () => {
   assert.equal(status, 200); assert.equal(data.balance, '4000');
   const [wrongChain] = await handle('POST', '/api/x402/balance', JSON.stringify({ network: 'eip155:8453', asset: h.mock.profile.asset.address, address: h.wallet.address, rpcUrl: 'https://oracle.example/rpc' }), { fetchImpl: h.mock.fetchImpl });
   assert.equal(wrongChain, 400);
+});
+
+// ---------- unsigned (generic x402) providers and discovery ----------
+import { discoverProvider, TEMPLATES } from '../demo/discover.mjs';
+test('generic provider without signed receipts verifies by settlement only, still fails closed on ledger', async () => {
+  const h = await harness({ receiptMode: 'unsigned' });
+  assert.equal(h.mock.profile.receipt.mode, 'unsigned');
+  const c = await h.client.call(h.sessionId, 'one', { symbol: 'BTC-USDT' });
+  assert.equal(c.state, 'VERIFIED'); assert.equal(c.verified.receipt.signer, 'none'); assert.match(c.verified.receipt.requestId, /^unsigned:0x/);
+  assert.equal(c.verified.ledger.verification, 'rpc-confirmed'); assert.equal(c.wire.body.receipt, undefined);
+  h.mock.setFault('rpc-down');
+  const d = await h.client.call(h.sessionId, 'two', { symbol: 'ETH-USDT' });
+  assert.equal(d.state, 'RECONCILIATION_REQUIRED', 'without a signed receipt, a failed ledger check leaves nothing to trust');
+  h.mock.setFault('none');
+  assert.equal((await h.client.reconcile(d.id)).state, 'VERIFIED');
+});
+test('discovery builds an unsigned profile from a live 402 and refuses unsafe targets', async () => {
+  const mock = createMockProvider({ origin: 'https://oracle.example', price: '2500' });
+  const found = await discoverProvider('https://oracle.example/api/v1/quote?symbol=BTC-USDT', mock.fetchImpl, { network: 'eip155:31337' });
+  assert.equal(found.profile.payTo, mock.payTo); assert.equal(found.profile.receipt.mode, 'unsigned'); assert.equal(found.profile.endpointPath, '/api/v1/quote');
+  assert.deepEqual(found.input, { symbol: 'BTC-USDT' }); assert.equal(found.quote.amount, '2500');
+  await assert.rejects(discoverProvider('https://oracle.example/api/v1/quote', mock.fetchImpl, { network: 'eip155:8453' }), /No exact EIP-3009 option on eip155:8453/);
+  for (const bad of ['http://oracle.example/x', 'https://localhost/x', 'https://10.0.0.1/x', 'https://a.internal/x']) await assert.rejects(discoverProvider(bad, mock.fetchImpl), /public HTTPS/);
+  await assert.rejects(discoverProvider('https://oracle.example/nope', mock.fetchImpl), /Expected HTTP 402/);
+  const [status, data] = await handle('POST', '/api/x402/discover', JSON.stringify({ url: 'https://oracle.example/api/v1/quote', network: 'eip155:31337' }), { fetchImpl: mock.fetchImpl });
+  assert.equal(status, 200); assert.equal(data.profile.id, 'oracle-example-api-v1-quote');
+  const [, meta] = await handle('GET', '/api/meta', '');
+  assert.ok(meta.templates.length >= 5); assert.ok(TEMPLATES.every(t => t.url.startsWith('https://')));
 });
