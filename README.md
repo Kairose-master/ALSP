@@ -53,7 +53,7 @@ The runner persists reservation, nonce, signed authorization, submission intent,
 npm run demo          # http://127.0.0.1:3402
 ```
 
-The default product on both pages is a **five-symbol price sheet** from one paid price API under one cap: five payments to the same provider, a retry that must not pay twice, and an archive that proves what was bought. After a sandbox agent run, the same product is replayed with a plain x402 retry loop (`naiveRun` in `public/sim.js`) and shown side by side: the loop pays six times for five answers and has no cap; the session pays five, reconciles the lost response and leaves a hash-chained archive.
+The default product on both pages is a **5-day BTC price history** from one paid price API under one cap (`coins=BTC&at=<day>`, one paid call per day): five payments to the same provider, a retry that must not pay twice, and an archive that proves what was bought. After a sandbox agent run, the same product is replayed with a plain x402 retry loop (`naiveRun` in `public/sim.js`) and shown side by side: the loop pays six times for five answers and has no cap; the session pays five, reconciles the lost response and leaves a hash-chained archive.
 
 Two more pages ship with the client: `learn.html`, a step-by-step walkthrough of the session concept on a simulated provider, and `agent.html`, where an AI agent (Claude, via `demo/agent.mjs`) is given a mission and hard caps and runs a whole session itself: terms, budgeted calls, a lost response, reconciliation, export and report. The model only decides; every tool executes in the browser on the real journal, in a free sandbox or live with your wallet.
 

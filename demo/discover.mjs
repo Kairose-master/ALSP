@@ -7,12 +7,11 @@ const PRIVATE_HOST = /^(localhost|.*\.localhost|.*\.local|.*\.internal|127\..*|1
 const slug = s => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 64) || 'provider';
 
 /** Known-good public endpoints, listed in the CDP x402 directory. Pinned payout addresses are read live from each 402, never hard-coded. */
-export const PRODUCT_SYMBOLS = ['BTC', 'ETH', 'SOL', 'DOGE', 'AVAX'];
 export const TEMPLATES = [
-  { id: 'price-sheet-apitoll', label: 'Portfolio price sheet · APIToll (5 symbols × 0.001 USDC)', url: 'https://crypto.apitoll.cloud/v1/crypto/price?symbol=BTC',
-    note: 'The default product: one paid quote per symbol, one session, one cap. This is where a session earns its keep: five payments to the same provider, retries that must not pay twice, and an archive that proves what was bought.',
+  { id: 'btc-history-apitoll', label: 'BTC 5-day price history · APIToll (5 × 0.001 USDC)', url: 'https://crypto.apitoll.cloud/v1/crypto/price?coins=BTC',
+    note: 'The default product: one paid call per day of history (coins=BTC&at=<unix seconds>), one session, one cap. Five payments to one provider, retries that must not pay twice, and an archive that proves what was bought.',
     caps: { maxTotal: '5000', maxPerCall: '1000', maxCalls: 5 },
-    mission: `Build a price sheet for ${PRODUCT_SYMBOLS.join(', ')} using this price endpoint: one paid call per symbol with the symbol parameter (keys like quote-btc). Handle any failure without ever paying twice and stay inside the caps. Then end the session, export the archive and report the sheet, the total cost, anything unresolved and the archive head hash.` },
+    mission: 'Build a 5-day BTC daily price history from this price endpoint: one paid call per day with coins=BTC and at=<unix seconds at 00:00 UTC> for each of these days: {{LAST_5_DAYS}}. Use keys like btc-2026-10-07. Handle any failure without ever paying twice and stay inside the caps. Then end the session, export the archive and report the history table, the total cost, anything unresolved and the archive head hash.' },
   { id: 'ping-402rates', label: '402rates ping (0.001 USDC)', url: 'https://api.402rates.com/v1/ping', note: 'Cheapest smoke test: a paid ping.' },
   { id: 'crypto-news-otto', label: 'OttoAI crypto news (0.001 USDC)', url: 'https://x402.ottoai.services/crypto-news', note: 'Latest crypto headlines.' },
   { id: 'crypto-price-apitoll', label: 'APIToll crypto price (0.001 USDC)', url: 'https://crypto.apitoll.cloud/v1/crypto/price?symbol=BTC', note: 'Spot price; change the symbol parameter.' },

@@ -11,12 +11,15 @@ const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '
 const short = (s, n = 12) => s ? `${String(s).slice(0, n)}…` : '—';
 const usdc = a => `${(Number(a) / 1e6).toFixed(6).replace(/0+$/, '').replace(/\.$/, '')} USDC`;
 const MAX_TURNS = 24;
-const PRODUCT = ['BTC-USDT', 'ETH-USDT', 'SOL-USDT', 'DOGE-USDT', 'AVAX-USDT'];
+const dayStart = daysAgo => { const d = new Date(); d.setUTCHours(0, 0, 0, 0); return Math.floor(d.getTime() / 1000) - daysAgo * 86400; };
+const LAST_DAYS = Array.from({ length: 5 }, (_, i) => { const ts = dayStart(i + 1); return { date: new Date(ts * 1000).toISOString().slice(0, 10), at: String(ts) }; });
+const DAYS_TEXT = LAST_DAYS.map(d => `${d.date} (at=${d.at})`).join(', ');
+const PRODUCT = LAST_DAYS.map(d => ({ coins: 'BTC', at: d.at }));
 const MISSIONS = {
-  sandbox: `Build a price sheet for ${PRODUCT.join(', ')} from the oracle: one paid quote per symbol (keys like quote-btc). Handle any failure without ever paying twice and stay inside the caps. Then end the session, export the archive and report the sheet, the total cost, anything unresolved and the archive head hash.`,
+  sandbox: `Build a 5-day BTC daily price history from the oracle: one paid call per day with coins=BTC and at=<unix seconds at 00:00 UTC> for each of these days: ${DAYS_TEXT}. Use keys like btc-${LAST_DAYS[0].date}. Handle any failure without ever paying twice and stay inside the caps. Then end the session, export the archive and report the history table, the total cost, anything unresolved and the archive head hash.`,
   live: 'Run an x402 Doctor preflight on https://ichimoku-signal.fizzl.eu/signal/BTC-USDT and tell me whether it is safe to pay, with the reasons the service gave. Then end the session, export the archive and report the cost and the archive head hash.',
 };
-
+const inputLabel = i => Object.entries(i ?? {}).map(([k, v]) => `${k}=${v}`).join('&') || '(none)';
 let meta = null, api = serverApi(''), wallet = null, mode = 'sandbox', payerMode = 'injected', sessionBox = null, picker = null;
 const logLine = (text, cls = '') => { const el = document.createElement('div'); el.className = `entry ${cls}`; el.textContent = text; $('#transcript').appendChild(el); el.scrollIntoView({ block: 'end' }); };
 function setPayer(m) {
@@ -36,7 +39,7 @@ function currentProviderJson() { return JSON.parse($('#providerJson').value); }
 function setMode(m) {
   mode = m; document.body.dataset.mode = m;
   $('#mission').value = MISSIONS[m];
-  if (m === 'live' && meta && !picker) picker = mountProviderPicker({ select: $('#preset'), json: $('#providerJson'), input: $('#input'), rpc: $('#rpcUrl'), discoverRow: $('#discoverRow'), url: $('#discoverUrl'), button: $('#discoverBtn'), note: $('#providerNote'), onChange: (_p, t) => { $('#pin').value = ''; $('#signerDoc').textContent = ''; if (t?.caps) { $('#maxTotal').value = t.caps.maxTotal; $('#maxPerCall').value = t.caps.maxPerCall; $('#maxCalls').value = t.caps.maxCalls; } if (t?.mission && mode === 'live') $('#mission').value = t.mission; } }, { meta, api, log: (t, c) => logLine(t, c) });
+  if (m === 'live' && meta && !picker) picker = mountProviderPicker({ select: $('#preset'), json: $('#providerJson'), input: $('#input'), rpc: $('#rpcUrl'), discoverRow: $('#discoverRow'), url: $('#discoverUrl'), button: $('#discoverBtn'), note: $('#providerNote'), onChange: (_p, t) => { $('#pin').value = ''; $('#signerDoc').textContent = ''; if (t?.caps) { $('#maxTotal').value = t.caps.maxTotal; $('#maxPerCall').value = t.caps.maxPerCall; $('#maxCalls').value = t.caps.maxCalls; } if (t?.mission && mode === 'live') $('#mission').value = t.mission.replace('{{LAST_5_DAYS}}', DAYS_TEXT); } }, { meta, api, log: (t, c) => logLine(t, c) });
 }
 async function connect() {
   try { wallet = injectedWallet(); const a = await wallet.connect(); $('#wallet').textContent = a; $('#connect').textContent = 'Connected'; } catch (e) { alert(e.message); }
@@ -53,8 +56,10 @@ async function terms(args) {
 const summary = async id => { const r = await run.journal.export(id); const s = run.journal.session(id); return { state: s.state === 'ACTIVE' ? 'ACTIVE' : r.summary.state, allocated: r.summary.allocatedTotal, verifiedSpent: r.summary.verifiedSpent, unresolved: r.summary.unresolved, calls: r.summary.calls, maxCalls: s.terms.maxCalls, remainingBudget: (BigInt(s.terms.maxTotal) - BigInt(r.summary.allocatedTotal)).toString(), events: r.events.length, head: r.headHash }; };
 const callView = c => ({ callId: c.id, key: c.requestKey, input: c.input, state: c.state, amount: c.amount, hasStoredResponse: Boolean(c.wire), lastError: c.state === 'VERIFIED' ? null : (run.errors.get(c.id) ?? null), tx: c.verified?.ledger.transaction ?? null, receiptId: c.verified?.receipt.requestId ?? null, response: c.state === 'VERIFIED' ? (({ receipt: _r, ...rest }) => rest)(c.wire.body) : null });
 
+const stringMap = v => Object.fromEntries(Object.entries(v && typeof v === 'object' ? v : {}).map(([k, x]) => [k, typeof x === 'string' ? x : String(x)]));
 const TOOL_IMPL = {
   async probe_quote({ input }) {
+    input = stringMap(input);
     const c = caps(), p = run.provider;
     const draft = { profile: PROFILE, payer: run.wallet.address, provider: p.payTo, network: p.network, asset: p.asset.address, endpoint: `${p.origin}${p.endpointPath}`, maxTotal: c.maxTotal, maxPerCall: c.maxPerCall, maxCalls: c.maxCalls, expiresAt: Date.now() + 600000, license: { uri: 'urn:alsp:probe', sha256: await sha256Text('probe'), acceptance: 'buyer-only' } };
     inputOf(input, p);
@@ -69,6 +74,7 @@ const TOOL_IMPL = {
     return { sessionId: run.sessionId, termsHash: await digest(t), ...await summary(run.sessionId) };
   },
   async call({ key, input }) {
+    input = stringMap(input);
     if (!run.sessionId) throw new Error('Create a session first');
     const c = await run.client.call(run.sessionId, key, input);
     return { ...callView(c), note: c.state === 'VERIFIED' ? 'Paid and verified.' : c.wire ? 'Response stored but verification failed (see lastError). If it looks transient (confirmations, RPC), reconcile with recover=false; if the receipt or signer is rejected, it will never verify.' : 'No response was captured; the payment may or may not have settled. Use reconcile with recover=true. Never retry with a new key.' };
@@ -134,8 +140,9 @@ async function start() {
   const c = caps();
   const context = `Mode: ${mode === 'sandbox' ? 'SANDBOX (simulated provider and wallet; nothing real is paid, but the journal rules are real)' : 'LIVE (real provider, real USDC on ' + provider.network + ', every payment needs the human\'s wallet signature)'}.
 Provider: ${provider.label} · endpoint ${provider.origin}${provider.endpointPath} · payTo ${provider.payTo}.
-Request parameters this provider accepts: ${provider.id === 'x402-doctor' ? '{"url": "<https url to preflight>", "method": "GET"|"POST"}' : mode === 'live' ? `flat string map; the human prepared ${$('#input').value.trim() || '{}'}` : 'flat string map, e.g. {"symbol": "BTC-USDT"}'}.${mode === 'live' ? ` Receipts: ${isUnsigned(provider) ? 'UNSIGNED (verification = on-chain settlement only; the response is unattested)' : 'signed by a pinned key'}.` : ''}
+Request parameters this provider accepts: ${provider.id === 'x402-doctor' ? '{"url": "<https url to preflight>", "method": "GET"|"POST"}' : mode === 'live' ? `flat string map; the human prepared ${$('#input').value.trim() || '{}'}` : 'flat string map, e.g. {"coins": "BTC", "at": "1791417600"}'}.${mode === 'live' ? ` Receipts: ${isUnsigned(provider) ? 'UNSIGNED (verification = on-chain settlement only; the response is unattested)' : 'signed by a pinned key'}.` : ''}
 Payer: ${w.address}${mode === 'live' ? (payerMode === 'session' ? ' (disposable session wallet: you sign automatically; its USDC balance is the real limit)' : ' (the human\'s wallet signs each payment)') : ''}. Provider response lookup for reconciliation: ${recover ? 'available' : 'NOT available'}.
+Today (UTC): ${new Date().toISOString()}. Last five UTC days with their 00:00 unix timestamps: ${DAYS_TEXT}.
 Hard caps set by the human (atomic USDC; 1000 = 0.001 USDC): maxTotal ${c.maxTotal}, maxPerCall ${c.maxPerCall}, maxCalls ${c.maxCalls}. Stay at or below these.
 
 Mission: ${$('#mission').value.trim()}`;
@@ -178,12 +185,12 @@ Mission: ${$('#mission').value.trim()}`;
 async function renderComparison() {
   const panel = $('#comparePanel'), el = $('#compare');
   panel.hidden = false; el.innerHTML = '<span class="spinner"></span> replaying the same product with a plain x402 retry loop…';
-  const symbols = run.journal.calls(run.sessionId).map(c => c.input.symbol);
-  const naive = await naiveRun({ symbols: symbols.length ? symbols : PRODUCT, price: '1000', loseResponseOnCall: 2 });
+  const inputs = run.journal.calls(run.sessionId).map(c => c.input);
+  const naive = await naiveRun({ inputs: inputs.length ? inputs : PRODUCT, price: '1000', loseResponseOnCall: 2 });
   const report = await run.journal.export(run.sessionId), s = run.journal.session(run.sessionId);
   const alsp = { payments: run.sim.world.paid, spent: report.summary.allocatedTotal, verified: report.summary.verifiedSpent, doublePaid: run.sim.world.paid - run.journal.calls(run.sessionId).length, unresolved: report.summary.unresolved, events: report.events.length, head: report.headHash, cap: s.terms.maxTotal };
   const row = (label, a, b, good) => `<tr><th>${label}</th><td class="${good === 'a' ? 'good' : good === 'b' ? 'badc' : ''}">${a}</td><td class="${good === 'a' ? 'badc' : good === 'b' ? 'good' : ''}">${b}</td></tr>`;
-  el.innerHTML = `<p class="hint">Same ${symbols.length || PRODUCT.length}-symbol price sheet, same price, same lost response on the 2nd call. Left: a plain x402 client that retries on error. Right: this ALSP session.</p>
+  el.innerHTML = `<p class="hint">Same ${inputs.length || PRODUCT.length}-call product (${(inputs.length ? inputs : PRODUCT).map(inputLabel).join(' · ')}), same price, same lost response on the 2nd call. Left: a plain x402 client that retries on error. Right: this ALSP session.</p>
     <table class="cmp"><thead><tr><th></th><th>Plain x402 retry loop</th><th>ALSP session</th></tr></thead><tbody>
     ${row('Payments settled by the provider', naive.payments, alsp.payments, naive.payments > alsp.payments ? 'b' : '')}
     ${row('USDC spent', usdc(naive.spent), usdc(alsp.spent), BigInt(naive.spent) > BigInt(alsp.spent) ? 'b' : '')}

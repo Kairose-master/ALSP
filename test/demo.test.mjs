@@ -247,7 +247,7 @@ test('discovery builds an unsigned profile from a live 402 and refuses unsafe ta
 import { naiveRun } from '../public/sim.js';
 test('a plain x402 retry loop pays twice for a lost response and has no cap; the session does neither', async () => {
   const symbols = ['BTC-USDT', 'ETH-USDT', 'SOL-USDT', 'DOGE-USDT', 'AVAX-USDT'];
-  const naive = await naiveRun({ symbols, price: '1000', loseResponseOnCall: 2 });
+  const naive = await naiveRun({ inputs: symbols.map(symbol => ({ symbol })), price: '1000', loseResponseOnCall: 2 });
   assert.equal(naive.payments, 6); assert.equal(naive.doublePaid, 1); assert.equal(naive.spent, '6000'); assert.ok(naive.rows.every(r => r.got));
   const h = await harness({ price: '1000' });
   // Same product under a 5-call, 0.005 USDC session with the same lost response on the 2nd call.

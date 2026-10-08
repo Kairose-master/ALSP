@@ -22,8 +22,8 @@ export function createSimWorld({ price = '1000', loseResponseOnCall = 2, latency
     send: async (_p, _t, input, prepared, nonce) => {
       await sleep(300 * latency);
       world.paid++; world.block++;
-      const symbol = String(input.symbol ?? input.q ?? 'BTC-USDT').toUpperCase();
-      const body = { symbol, price: priceOf(symbol), currency: 'USD', source: 'sim-oracle', quotedAt: new Date().toISOString(), receipt: { request_id: `req_${nonce.slice(2, 10)}`, route: simProvider.receipt.route, signer: SIM.SIGNER, payment: { proof: 'eip3009', amount: prepared.authorization.value, nonce } } };
+      const symbol = String(input.coins ?? input.symbol ?? input.q ?? 'BTC').toUpperCase(), at = input.at ? Number(input.at) : null;
+      const body = { symbol, at, price: priceOf(`${symbol}@${at ?? 'now'}`), currency: 'USD', source: 'sim-oracle', quotedAt: new Date().toISOString(), receipt: { request_id: `req_${nonce.slice(2, 10)}`, route: simProvider.receipt.route, signer: SIM.SIGNER, payment: { proof: 'eip3009', amount: prepared.authorization.value, nonce } } };
       const wire = { status: 200, body, settlement: { success: true, network: SIM.NETWORK, transaction: fakeHex(32), payer: SIM.PAYER } };
       world.responses.set(nonce, { wire, block: world.block });
       if (world.paid === world.loseResponseOnCall) throw new Error('socket hang up after the provider settled');
@@ -48,10 +48,10 @@ export const memoryStorage = () => { const m = new Map(); return { getItem: k =>
  * Runs against a fresh simulated world with the same price and the same lost response, so the
  * difference with the session run is only the protocol, not luck.
  */
-export async function naiveRun({ symbols, price = '1000', loseResponseOnCall = 2, maxRetries = 2, latency = 0 } = {}) {
+export async function naiveRun({ inputs, price = '1000', loseResponseOnCall = 2, maxRetries = 2, latency = 0 } = {}) {
   const sim = createSimWorld({ price, loseResponseOnCall, latency });
   const rows = [];
-  for (const symbol of symbols) {
+  for (const input of inputs) {
     let response = null, attempts = 0, error = null;
     while (!response && attempts <= maxRetries) {
       attempts++;
@@ -59,10 +59,10 @@ export async function naiveRun({ symbols, price = '1000', loseResponseOnCall = 2
         const { quote } = await sim.api.probe();
         const nonce = `0x${Array.from(crypto.getRandomValues(new Uint8Array(32)), b => b.toString(16).padStart(2, '0')).join('')}`;
         const prepared = await sim.wallet.prepare(quote, { expiresAt: Date.now() + 600000 }, nonce, Date.now());
-        response = (await sim.api.send(null, null, { symbol }, prepared, nonce)).wire; // a timeout here looks like "not paid" to a naive client
+        response = (await sim.api.send(null, null, input, prepared, nonce)).wire; // a timeout here looks like "not paid" to a naive client
       } catch (e) { error = e.message; }
     }
-    rows.push({ symbol, attempts, got: Boolean(response), error: response ? null : error });
+    rows.push({ input, attempts, got: Boolean(response), error: response ? null : error });
   }
   const paid = sim.world.paid;
   return { rows, payments: paid, spent: (BigInt(price) * BigInt(paid)).toString(), doublePaid: paid - rows.filter(r => r.got).length, evidence: 'none', cap: 'none' };
