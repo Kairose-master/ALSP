@@ -20,7 +20,7 @@ function sharedLocks() {
 }
 
 /** Drives the browser client exactly like app.js does, against the stateless handler and an in-process provider. */
-async function harness({ price = '1000', origin = 'https://oracle.example', maxTotal = '3000', locks } = {}) {
+async function harness({ price = '1000', origin = 'https://oracle.example', maxTotal = '3000', locks = sharedLocks() } = {}) {
   const mock = createMockProvider({ price, origin });
   const deps = { fetchImpl: mock.fetchImpl };
   const api = {
