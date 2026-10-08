@@ -159,7 +159,7 @@ $('#usePublishedSigner').onclick = () => { try { const d = JSON.parse($('#signer
 (async () => {
   try {
     meta = await api.meta();
-    picker = mountProviderPicker({ select: $('#preset'), json: $('#providerJson'), input: $('#input'), rpc: $('#rpcUrl'), discoverRow: $('#discoverRow'), url: $('#discoverUrl'), button: $('#discoverBtn'), note: $('#providerNote'), onChange: () => { $('#pin').value = ''; $('#signerDoc').textContent = ''; } }, { meta, api, log });
+    picker = mountProviderPicker({ select: $('#preset'), json: $('#providerJson'), input: $('#input'), rpc: $('#rpcUrl'), discoverRow: $('#discoverRow'), url: $('#discoverUrl'), button: $('#discoverBtn'), note: $('#providerNote'), onChange: (_p, t) => { $('#pin').value = ''; $('#signerDoc').textContent = ''; if (t?.caps) { $('#maxTotal').value = t.caps.maxTotal; $('#maxPerCall').value = t.caps.maxPerCall; $('#maxCalls').value = t.caps.maxCalls; } } }, { meta, api, log });
     if (meta.allowedOrigins) log(`This deployment only proxies: ${meta.allowedOrigins.join(', ')}`);
     renderSessions(); renderSession();
     if (globalThis.ethereum) log('Wallet detected. Connect to begin.'); else log('No injected wallet detected. Install MetaMask (or any EIP-1193 wallet) on Base to pay.', 'warn');

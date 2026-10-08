@@ -44,6 +44,7 @@ table{width:100%;border-collapse:collapse;font-size:12px;margin-top:6px}th,td{te
 code,.mono{font:11px var(--mono);word-break:break-all}pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px;font:11px var(--mono);white-space:pre-wrap;max-height:200px;overflow:auto;margin:6px 0 0}
 .empty{color:var(--muted);padding:16px 0;text-align:center}a{color:var(--accent)}
 #stats{font-size:12px;color:var(--muted)}
+.cmp td.good{color:var(--ok);font-weight:600}.cmp td.badc{color:var(--bad);font-weight:600}.cmp th:first-child{width:38%}
 </style>
 </head>
 <body data-mode="sandbox">
@@ -62,8 +63,8 @@ code,.mono{font:11px var(--mono);word-break:break-all}pre{background:var(--bg);b
       <label>What the agent should accomplish</label>
       <textarea id="mission" rows="6"></textarea>
       <label>Hard caps the agent cannot exceed (atomic USDC)</label>
-      <div class="row3"><input id="maxTotal" value="4000" title="maxTotal"><input id="maxPerCall" value="1000" title="maxPerCall"><input id="maxCalls" type="number" min="1" max="20" value="4" title="maxCalls"></div>
-      <p class="hint">total · per call · max calls. In Sandbox the provider drops the response of the 2nd paid call after settling it, so you can watch the agent reconcile instead of paying twice.</p>
+      <div class="row3"><input id="maxTotal" value="5000" title="maxTotal"><input id="maxPerCall" value="1000" title="maxPerCall"><input id="maxCalls" type="number" min="1" max="20" value="5" title="maxCalls"></div>
+      <p class="hint">total · per call · max calls. The default product is a five-symbol price sheet: five payments to one provider under one cap. In Sandbox the provider drops the response of the 2nd paid call after settling it; when the agent finishes, the same product is replayed without ALSP so you can compare.</p>
       <div class="actions"><button class="primary" id="start">▶ Run agent</button><button id="stop" disabled>■ Stop</button><button id="download" disabled>Download archive</button></div>
       <p id="stats" class="hint"></p>
     </section>
@@ -84,7 +85,10 @@ code,.mono{font:11px var(--mono);word-break:break-all}pre{background:var(--bg);b
       <p class="hint">The agent proposes the terms; you confirm them once, then sign each payment in your wallet. It cannot exceed the hard caps above.</p>
     </section>
   </div>
-  <section class="panel"><h2>Agent transcript</h2><div id="transcript"><div class="empty">Press Run to start.</div></div></section>
+  <div>
+    <section class="panel"><h2>Agent transcript</h2><div id="transcript"><div class="empty">Press Run to start.</div></div></section>
+    <section class="panel" id="comparePanel" hidden><h2>Why a session: the same product without ALSP</h2><div id="compare"></div></section>
+  </div>
   <div class="right"><section class="panel"><h2>Journal (live)</h2><div id="journal"><div class="empty">No session yet.</div></div></section></div>
 </main>
 <script type="module" src="./agent.js"></script>
