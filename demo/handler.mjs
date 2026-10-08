@@ -2,7 +2,8 @@
 // The browser owns the wallet and the journal; this side only does what the library already does:
 // fetch the 402 challenge, forward one signed payment, verify receipts/settlement, verify archives.
 // It never stores keys, authorizations or responses.
-import { DOCTOR_PROVIDER, PROFILE, address, atomic, boundedFetch, canonical, defineProvider, digest, hash32, jsonRpc, object, providerJson, requestUrl, selectQuote, validatePrepared, validateTerms, verifyBuyerSeal, verifyChain, verifyReceipt, verifySettlement, x402Transport } from '../dist/index.js';
+import { agentEnabled, agentTurn, MODEL as AGENT_MODEL } from './agent.mjs';
+import { DOCTOR_PROVIDER, PROFILE, address, atomic, boundedFetch, canonical, chainIdOf, defineProvider, digest, hash32, jsonRpc, object, providerJson, requestUrl, selectQuote, validatePrepared, validateTerms, verifyBuyerSeal, verifyChain, verifyReceipt, verifySettlement, x402Transport } from '../dist/index.js';
 
 const MAX_BODY = 512 * 1024;
 const PRESETS = { [DOCTOR_PROVIDER.id]: DOCTOR_PROVIDER };
@@ -31,6 +32,19 @@ function rpcFor(terms, requested, deps) {
   if (u.protocol !== 'https:' || PRIVATE_HOST.test(u.hostname)) throw new Error('RPC URL must be a public HTTPS endpoint');
   return jsonRpc(url, deps?.fetchImpl ?? fetch);
 }
+/** A payment verified seconds after settlement often has 1 confirmation or an RPC that has not indexed the receipt yet.
+ *  Those are transient, so retry them for a bounded time; every other failure is final. */
+const TRANSIENT = /Insufficient confirmations|Expected an object|RPC HTTP failure|RPC response too large|Invalid RPC response|No RPC body|fetch failed|aborted/i;
+async function settleWithPatience(call, terms, rpc, deps) {
+  const attempts = deps.settleAttempts ?? 6, delayMs = deps.settleDelayMs ?? 2500;
+  for (let i = 1; ; i++) {
+    try { return await verifySettlement(call, terms, rpc, 2); }
+    catch (err) {
+      if (i >= attempts || !(err instanceof Error) || !TRANSIENT.test(err.message)) throw err;
+      await new Promise(r => setTimeout(r, delayMs));
+    }
+  }
+}
 function callOf(value) {
   const c = object(value);
   return { id: String(c.id ?? ''), sessionId: String(c.sessionId ?? ''), requestKey: String(c.requestKey ?? ''), requestHash: String(c.requestHash ?? ''), input: object(c.input), quote: object(c.quote), amount: atomic(c.amount).toString(), nonce: hash32(c.nonce), createdAt: Number(c.createdAt), state: String(c.state ?? ''), prepared: c.prepared ? object(c.prepared) : null, wire: c.wire ? object(c.wire) : null, verified: null };
@@ -44,12 +58,23 @@ export async function handle(method, path, rawBody, deps = {}) {
   const fetchImpl = deps.fetchImpl ?? fetch, transport = p => x402Transport(p, fetchImpl);
   try {
     if (method === 'GET' && path === '/api/meta') {
-      return [200, { profile: PROFILE, presets: Object.fromEntries(Object.values(PRESETS).map(p => [p.id, providerJson(p)])), defaultRpc: DEFAULT_RPC, allowedOrigins: allowedOrigins(), interopTarget: 'https://ichimoku-signal.fizzl.eu/signal/BTC-USDT' }];
+      return [200, { profile: PROFILE, presets: Object.fromEntries(Object.values(PRESETS).map(p => [p.id, providerJson(p)])), defaultRpc: DEFAULT_RPC, allowedOrigins: allowedOrigins(), interopTarget: 'https://ichimoku-signal.fizzl.eu/signal/BTC-USDT', agent: { enabled: agentEnabled(), model: AGENT_MODEL } }];
     }
     if (method !== 'POST') return [404, { error: 'Not found' }];
     if (rawBody && rawBody.length > MAX_BODY) return [413, { error: 'Request too large' }];
     const body = object(rawBody ? JSON.parse(rawBody) : {});
 
+    if (path === '/api/agent/turn') return agentTurn(body, deps.agent ?? {});
+    if (path === '/api/x402/balance') {
+      // Read-only ERC-20 balanceOf through the configured RPC, for funding/sweeping a session wallet.
+      const network = String(body.network), asset = address(body.asset), who = address(body.address);
+      const rpc = rpcFor({ network }, body.rpcUrl, deps);
+      if (BigInt(chainIdOf(network)) !== BigInt(String(await rpc('eth_chainId', [])))) throw new Error('RPC chain does not match the requested network');
+      const data = `0x70a08231${who.slice(2).padStart(64, '0')}`;
+      const result = String(await rpc('eth_call', [{ to: asset, data }, 'latest']));
+      if (!/^0x[0-9a-fA-F]{0,64}$/.test(result)) throw new Error('Invalid balance response');
+      return [200, { balance: BigInt(result === '0x' ? '0x0' : result).toString() }];
+    }
     if (path === '/api/x402/signer') {
       // Unpaid: the provider's published signer document. Shown for review only; it never becomes a pin by itself.
       const p = resolveProvider(body.provider);
@@ -82,7 +107,7 @@ export async function handle(method, path, rawBody, deps = {}) {
       const p = resolveProvider(body.provider), terms = object(body.terms), call = callOf(body.call), pins = pinsOf(body.pins);
       validateTerms(terms, p);
       const receipt = await verifyReceipt(call, terms, pins, p);
-      const ledger = await verifySettlement(call, terms, rpcFor(terms, body.rpcUrl, deps), 2);
+      const ledger = await settleWithPatience(call, terms, rpcFor(terms, body.rpcUrl, deps), deps);
       return [200, { verified: { receipt, ledger, semanticCorrectness: 'not-verified' } }];
     }
     if (path === '/api/archive/verify') {

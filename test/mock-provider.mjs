@@ -80,6 +80,7 @@ export function createMockProvider({ origin = 'https://oracle.alsp.local', price
     const result = {
       eth_chainId: () => `0x${chainId.toString(16)}`,
       eth_blockNumber: () => `0x${head.toString(16)}`,
+      eth_call: () => `0x${(state.balance ?? 4000n).toString(16).padStart(64, '0')}`,
       eth_getTransactionReceipt: () => state.blocks.find(b => b.receipt.transactionHash === String(params[0]).toLowerCase())?.receipt ?? null,
       eth_getBlockByNumber: () => { const n = Number(params[0]), hash = n === head ? keccak256(toHex(`block:${head}`)) : state.blocks.find(b => b.number === n)?.hash; return hash ? { number: params[0], hash } : null; },
     }[method];

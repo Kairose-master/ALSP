@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>What is a Session</title>
+<meta name="description" content="Interactive walkthrough of the ALSP session: terms, budgets, idempotent calls, the hash-chained journal, failure reconciliation and the exported archive, run step by step in your browser.">
+<style>
+:root{--bg:#f6f7f9;--panel:#fff;--ink:#17202a;--muted:#5b6672;--line:#dfe3e8;--accent:#2457d6;--ok:#1d8a4b;--bad:#c23b3b;--warn:#b7791f;--chip:#eef1f5;--new:#fff6d6;--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#0f1216;--panel:#171b21;--ink:#e8ecf1;--muted:#98a2ad;--line:#2a313a;--accent:#7aa2ff;--ok:#4cc38a;--bad:#ff6b6b;--warn:#e2b14a;--chip:#222831;--new:#3a3415}}
+:root[data-theme=dark]{--bg:#0f1216;--panel:#171b21;--ink:#e8ecf1;--muted:#98a2ad;--line:#2a313a;--accent:#7aa2ff;--ok:#4cc38a;--bad:#ff6b6b;--warn:#e2b14a;--chip:#222831;--new:#3a3415}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+header{padding:20px 16px 8px;max-width:1280px;margin:0 auto;display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between}
+h1{font-size:20px;margin:0}header p{margin:4px 0 0;color:var(--muted);font-size:14px;max-width:760px}
+.badge{display:inline-block;font-size:12px;padding:2px 8px;border-radius:999px;background:var(--chip);color:var(--muted);margin-left:8px;vertical-align:middle}
+main{max-width:1280px;margin:0 auto;padding:8px 16px 48px;display:grid;grid-template-columns:260px 1fr 1fr;gap:16px}
+@media (max-width:1100px){main{grid-template-columns:260px 1fr}.state-col{grid-column:1/-1}}
+@media (max-width:760px){main{grid-template-columns:1fr}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:16px}
+.panel h2{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0 0 10px}
+h3{font-size:14px;margin:14px 0 6px}
+button{cursor:pointer;border:1px solid var(--line);background:var(--chip);color:var(--ink);padding:8px 12px;border-radius:8px;font:inherit}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}button:disabled{opacity:.5;cursor:wait}
+#steps{list-style:none;margin:0;padding:0}#steps li{padding:6px 8px;border-radius:6px;color:var(--muted);font-size:14px}#steps li.done{color:var(--ink)}#steps li.current{background:var(--chip);color:var(--ink);font-weight:600}
+#stepTitle{font-size:18px;margin:0 0 8px}#stepBody{font-size:15px}#stepBody code{font:12px var(--mono);background:var(--chip);padding:1px 4px;border-radius:4px}
+.diagram{font:12px/1.5 var(--mono);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px;overflow:auto;white-space:pre}
+.actions{display:flex;gap:8px;margin-top:14px}
+.strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:6px;margin-bottom:8px}
+.tile{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:6px 8px}.tile .k{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}.tile .v{font-size:14px;font-weight:600;margin-top:1px;font-variant-numeric:tabular-nums}
+.state{font:11px var(--mono);padding:2px 6px;border-radius:6px;background:var(--chip)}.state.VERIFIED,.state.CLOSED{color:var(--ok)}.state.RECONCILIATION_REQUIRED,.state.SUBMITTED,.state.AUTHORIZED,.state.RESERVED{color:var(--warn)}
+table{width:100%;border-collapse:collapse;font-size:12px;margin-top:6px}th,td{text-align:left;padding:4px 6px;border-top:1px solid var(--line);vertical-align:top}th{color:var(--muted);font-weight:500;border-top:0}
+tr.new td{background:var(--new)}
+code,.mono{font:11px var(--mono);word-break:break-all}.muted{color:var(--muted)}
+#narration{max-height:280px;overflow:auto;font-size:13px}.log{padding:4px 0;border-top:1px solid var(--line)}.log.ok{color:var(--ok)}.log.bad{color:var(--bad)}.log.warn{color:var(--warn)}
+details{margin-top:12px}summary{cursor:pointer;color:var(--muted);font-size:13px}
+pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px;overflow:auto;font:11px var(--mono);max-height:320px;margin:8px 0 0;white-space:pre-wrap}
+.empty{color:var(--muted);padding:16px 0;text-align:center}a{color:var(--accent)}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>What is a session? <span class="badge">simulated provider · nothing is paid</span></h1>
+    <p>Step through a real ALSP journal in your browser: terms, budgets, idempotent calls, the hash chain, a lost response and its reconciliation, and the exported archive. Only the provider, wallet and ledger are simulated here.</p>
+  </div>
+  <div style="display:flex;gap:8px"><button id="lang">한국어</button><a href="./"><button>Real client →</button></a></div>
+</header>
+<main>
+  <section class="panel"><h2>Steps</h2><ol id="steps"></ol></section>
+  <div>
+    <section class="panel">
+      <h2 id="stepTitle"></h2>
+      <div id="stepBody"></div>
+      <div class="actions"><button class="primary" id="next">Start ▶</button></div>
+    </section>
+    <section class="panel"><h2>What just happened</h2><div id="narration"></div></section>
+  </div>
+  <div class="state-col">
+    <section class="panel"><h2>Journal (live)</h2><div id="state"></div>
+      <details id="archiveBox"><summary>Exported archive (session 1)</summary><pre id="archive"></pre></details>
+    </section>
+  </div>
+</main>
+<script type="module" src="./learn.js"></script>
+</body>
+</html>

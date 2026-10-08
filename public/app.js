@@ -1,11 +1,20 @@
 import { BrowserJournal, BrowserSessionClient, PROFILE, canonical, digest, injectedWallet, inputOf, serverApi, sha256Text, verifyChain } from './alsp-browser.js';
+import { mountSessionWallet } from './session-wallet.js';
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const short = (s, n = 10) => s ? `${String(s).slice(0, n)}…` : '—';
 const usdc = a => `${(Number(a) / 1e6).toFixed(6).replace(/0+$/, '').replace(/\.$/, '')} USDC`;
 const api = serverApi(''), journal = new BrowserJournal();
-let meta = null, wallet = null, selected = null, busy = false;
+let meta = null, wallet = null, selected = null, busy = false, payerMode = 'injected', sessionBox = null;
+const payerWallet = () => payerMode === 'session' ? sessionBox?.wallet : wallet;
+function setPayer(m) {
+  payerMode = m; $('#sessionWalletBox').hidden = m !== 'session';
+  if (m === 'session' && !sessionBox) {
+    sessionBox = mountSessionWallet($('#sessionWalletBox'), { api, log, chain: () => { const p = currentProvider(); return { network: p.network, asset: p.asset, rpcUrl: $('#rpcUrl').value.trim() || undefined }; }, injected: () => wallet?.address ? { ethereum: globalThis.ethereum, address: wallet.address } : null });
+    sessionBox.refresh();
+  }
+}
 
 const log = (text, kind = '') => { const el = document.createElement('div'); el.className = `log ${kind}`; el.textContent = `${new Date().toLocaleTimeString()} ${text}`; $('#log').prepend(el); };
 const setBusy = b => { busy = b; document.querySelectorAll('button[data-busy]').forEach(x => x.disabled = b); };
@@ -47,12 +56,13 @@ async function connect() {
 // ---------- session ----------
 async function createSession() {
   try {
-    if (!wallet?.address) throw new Error('Connect a wallet first');
+    const payer = payerWallet();
+    if (!payer?.address) throw new Error(payerMode === 'session' ? 'Session wallet not ready' : 'Connect a wallet first');
     const p = currentProvider(), license = $('#license').value;
     if (!license.trim()) throw new Error('Paste the provider terms you reviewed; their SHA-256 is committed in the session');
     const maxTotal = $('#maxTotal').value.trim(), maxPerCall = $('#maxPerCall').value.trim(), maxCalls = Number($('#maxCalls').value), ttl = Number($('#ttl').value);
-    const terms = { profile: PROFILE, payer: wallet.address, provider: p.payTo, network: p.network, asset: p.asset.address, endpoint: `${p.origin}${p.endpointPath}`, maxTotal, maxPerCall, maxCalls, expiresAt: Date.now() + ttl * 1000, license: { uri: $('#licenseUri').value.trim() || 'urn:alsp:locally-reviewed-terms', sha256: await sha256Text(license), acceptance: 'buyer-only' } };
-    if (!confirm(`Create a session that may spend up to ${usdc(maxTotal)} (≤ ${usdc(maxPerCall)} per call, ≤ ${maxCalls} calls) from ${wallet.address} to ${p.payTo} on ${p.network}?\n\nEvery payment still needs a wallet signature.`)) return;
+    const terms = { profile: PROFILE, payer: payer.address, provider: p.payTo, network: p.network, asset: p.asset.address, endpoint: `${p.origin}${p.endpointPath}`, maxTotal, maxPerCall, maxCalls, expiresAt: Date.now() + ttl * 1000, license: { uri: $('#licenseUri').value.trim() || 'urn:alsp:locally-reviewed-terms', sha256: await sha256Text(license), acceptance: 'buyer-only' } };
+    if (!confirm(`Create a session that may spend up to ${usdc(maxTotal)} (≤ ${usdc(maxPerCall)} per call, ≤ ${maxCalls} calls) from ${payer.address} to ${p.payTo} on ${p.network}?\n\n${payerMode === 'session' ? 'The disposable session wallet signs automatically; its balance is the real limit.' : 'Every payment still needs a wallet signature.'}`)) return;
     const id = await journal.create(terms, p);
     log(`Session ${id} created (terms hash ${short(await digest(terms), 16)})`, 'ok');
     selected = id; renderSessions(); renderSession();
@@ -61,7 +71,7 @@ async function createSession() {
 function client() {
   const pin = $('#pin').value.trim();
   if (!pin) throw new Error('Enter the independently checked receipt signer pin');
-  return new BrowserSessionClient(journal, { api, wallet, pins: [{ address: pin }], rpcUrl: $('#rpcUrl').value.trim() || undefined, onStep: (step, c, err) => {
+  return new BrowserSessionClient(journal, { api, wallet: payerWallet(), pins: [{ address: pin }], rpcUrl: $('#rpcUrl').value.trim() || undefined, onStep: (step, c, err) => {
     const label = { replay: 'Idempotent replay: persisted call returned, no new signature or payment', probe: 'Fetching 402 challenge (unpaid)', reserved: `Reserved ${c ? usdc(c.amount) : ''} and nonce ${c ? short(c.nonce, 12) : ''}; asking the wallet to sign`, submitting: 'Submission intent journaled; sending the signed authorization once', verifying: 'Verifying receipt signature and RPC settlement' }[step];
     if (step === 'error') log(`Call ${c ? short(c.id, 8) : ''}: ${err.message}. Funds stay reserved; nothing is retried automatically.`, 'bad'); else log(label);
   } });
@@ -69,7 +79,7 @@ function client() {
 async function makeCall() {
   try {
     if (!selected) throw new Error('Select or create a session');
-    if (!wallet?.address) throw new Error('Connect a wallet first');
+    if (!payerWallet()?.address) throw new Error('Connect a wallet or enable the session wallet first');
     const input = JSON.parse($('#input').value), key = $('#key').value.trim() || `call-${journal.calls(selected).length + 1}`;
     const s = journal.session(selected); inputOf(input, s.provider);
     setBusy(true);
@@ -100,10 +110,11 @@ async function exportArchive(seal) {
     const report = await journal.export(selected);
     let archive = report;
     if (seal) {
-      if (!wallet?.address) throw new Error('Connect the payer wallet to seal');
+      const sealer = [payerWallet(), wallet, sessionBox?.wallet].find(w => w?.address && w.address.toLowerCase() === report.terms.payer.toLowerCase());
+      if (!sealer) throw new Error('The payer wallet of this session is not available to seal');
       const manifest = { profile: PROFILE, sessionId: selected, archiveSha256: await digest(report), headHash: report.headHash };
-      const signature = await wallet.signMessage(canonical(manifest));
-      archive = { ...report, buyerSeal: { manifest, signer: wallet.address, signature } };
+      const signature = await sealer.signMessage(canonical(manifest));
+      archive = { ...report, buyerSeal: { manifest, signer: sealer.address, signature } };
     }
     const local = await verifyChain(report);
     let remote = null;
@@ -149,6 +160,7 @@ async function renderSession() {
 // ---------- boot ----------
 $('#connect').onclick = connect; $('#create').onclick = createSession; $('#call').onclick = makeCall; $('#fetchSigner').onclick = fetchSigner;
 $('#preset').onchange = e => loadPreset(e.target.value);
+document.querySelectorAll('input[name=payer]').forEach(r => r.onchange = e => setPayer(e.target.value));
 $('#usePublishedSigner').onclick = () => { try { const d = JSON.parse($('#signerDoc').textContent); const a = d.signer ?? d.address ?? (Array.isArray(d.signers) ? (d.signers.find(x => x.status === 'current') ?? d.signers[0])?.address : undefined); if (!a) throw new Error('no signer field'); $('#pin').value = a; log('Pin copied from the published document. This is trust-on-first-use unless you verified it elsewhere.', 'warn'); } catch (e) { log(`Could not read a signer address: ${e.message}`, 'bad'); } };
 (async () => {
   try {
