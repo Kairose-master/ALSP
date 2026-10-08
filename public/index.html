@@ -52,11 +52,13 @@ a{color:var(--accent)}
     <section class="panel">
       <h2>1 · Provider profile</h2>
       <select id="preset"></select>
+      <div id="discoverRow" class="actions" style="margin-top:8px" hidden><input id="discoverUrl" placeholder="https://provider.example/paid?x=1" style="flex:1;min-width:200px"><button id="discoverBtn">Discover from 402</button></div>
+      <p class="hint" id="providerNote"></p>
       <label>Profile JSON (origin, endpoint, network, asset, payTo, receipt binding)</label>
       <textarea id="providerJson" rows="12"></textarea>
       <div class="actions"><button data-busy id="fetchSigner">Fetch published signer</button><button id="usePublishedSigner">Use as pin</button></div>
       <pre id="signerDoc" class="muted"></pre>
-      <label>Receipt signer pin (address you verified independently)</label>
+      <label>Receipt signer pin (signed-receipt providers only; verified independently)</label>
       <input id="pin" placeholder="0x…">
       <label>Read-only RPC URL for settlement checks (HTTPS)</label>
       <input id="rpcUrl" placeholder="https://mainnet.base.org">

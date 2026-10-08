@@ -82,8 +82,9 @@ export interface ProviderProfile {
   asset: { address: string; name: string; version: string };
   /** Pinned payout address. Also the authority that certifies rotated receipt signers. */
   payTo: string;
-  /** Receipt binding: route string, cert service name and cert message header. */
-  receipt: { route: string; service: string; certHeader: string };
+  /** Receipt binding. `signed` (default) expects Doctor's eip191-canonical-json-v1 receipt bound to route/input/payment;
+   *  `unsigned` providers return plain JSON and are verified by RPC-confirmed settlement only. */
+  receipt: { mode?: 'signed' | 'unsigned'; route?: string; service?: string; certHeader?: string };
   /** Validates/normalizes request parameters. Defaults to flat string query parameters. */
   input?: (value: unknown) => Record<string, string>;
   /** Validates the paid response body shape before signature checks. */
@@ -112,8 +113,11 @@ export function defineProvider(profile: ProviderProfile): ProviderProfile {
   chainIdOf(p.network);
   address(p.asset.address); text(p.asset.name); text(p.asset.version);
   address(p.payTo);
-  text(p.receipt.route); text(p.receipt.service); text(p.receipt.certHeader);
-  if (p.receipt.route !== `${p.method} ${p.endpointPath}`) throw new Error('Receipt route must match method and endpoint path');
+  if (p.receipt.mode !== undefined && p.receipt.mode !== 'signed' && p.receipt.mode !== 'unsigned') throw new Error('Invalid receipt mode');
+  if (p.receipt.mode !== 'unsigned') {
+    text(p.receipt.route); text(p.receipt.service); text(p.receipt.certHeader);
+    if (p.receipt.route !== `${p.method} ${p.endpointPath}`) throw new Error('Receipt route must match method and endpoint path');
+  }
   if (p.input !== undefined && typeof p.input !== 'function') throw new Error('Invalid input validator');
   if (p.validateBody !== undefined && typeof p.validateBody !== 'function') throw new Error('Invalid body validator');
   return Object.freeze(p);
@@ -216,7 +220,7 @@ export function selectQuote(challenge: unknown, terms: Terms, input: RequestInpu
       const a = object(entry), extra = object(a.extra);
       if (a.scheme !== 'exact' || a.network !== terms.network || address(a.asset) !== address(terms.asset) || address(a.payTo) !== address(terms.provider)) continue;
       if (extra.name !== p.asset.name || extra.version !== p.asset.version || (extra.assetTransferMethod !== undefined && extra.assetTransferMethod !== 'eip3009')) continue;
-      if (!Number.isSafeInteger(a.maxTimeoutSeconds) || Number(a.maxTimeoutSeconds) < 1 || Number(a.maxTimeoutSeconds) > 300) continue;
+      if (!Number.isSafeInteger(a.maxTimeoutSeconds) || Number(a.maxTimeoutSeconds) < 1 || Number(a.maxTimeoutSeconds) > 3600) continue;
       const amount = atomic(a.amount);
       if (amount === 0n || amount > atomic(terms.maxPerCall)) continue;
       options.push({ scheme: 'exact', network: terms.network, asset: text(a.asset), payTo: text(a.payTo), amount: amount.toString(), maxTimeoutSeconds: Number(a.maxTimeoutSeconds), extra });

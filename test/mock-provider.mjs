@@ -25,12 +25,12 @@ export const FAULTS = {
 };
 
 /** Creates a fresh provider + ledger. `price` is the atomic amount per call. */
-export function createMockProvider({ origin = 'https://oracle.alsp.local', price = '1000', network = 'eip155:31337' } = {}) {
+export function createMockProvider({ origin = 'https://oracle.alsp.local', price = '1000', network = 'eip155:31337', receiptMode = 'signed' } = {}) {
   const payTo = privateKeyToAccount(DEMO_PAYTO_KEY), signer = privateKeyToAccount(DEMO_SIGNER_KEY), stranger = privateKeyToAccount(DEMO_STRANGER_KEY);
   const profile = defineProvider({
     id: 'demo-oracle', label: 'Demo price oracle (mock ledger)', origin, endpointPath: '/api/v1/quote', method: 'GET', signerPath: '/.well-known/x402-signer.json',
     network, asset: { address: DEMO_ASSET, name: 'USD Coin', version: '2' }, payTo: payTo.address,
-    receipt: { route: 'GET /api/v1/quote', service: 'alsp-demo-oracle', certHeader: 'alsp demo receipt signer' },
+    receipt: receiptMode === 'unsigned' ? { mode: 'unsigned' } : { route: 'GET /api/v1/quote', service: 'alsp-demo-oracle', certHeader: 'alsp demo receipt signer' },
   });
   const chainId = chainIdOf(network);
   const state = { fault: 'none', nonces: new Set(), blocks: [], responses: new Map(), paid: 0, rpcCalls: 0 };
@@ -62,11 +62,11 @@ export function createMockProvider({ origin = 'https://oracle.alsp.local', price
     // Build and sign the receipt (Doctor's eip191-canonical-json-v1 format, generic body).
     const symbol = (input.symbol ?? 'BTC-USDT').toUpperCase();
     const body = { symbol, price: syntheticPrice(symbol), currency: 'USD', source: 'alsp-demo-oracle', quotedAt: new Date().toISOString(),
-      receipt: { request_id: `req_${tx.slice(2, 18)}`, route: profile.receipt.route, input_sha256: digest({ route: profile.receipt.route, input }), signed_at: new Date().toISOString(), signer: signer.address, algorithm: 'eip191-canonical-json-v1',
+      receipt: { request_id: `req_${tx.slice(2, 18)}`, route: 'GET /api/v1/quote', input_sha256: digest({ route: 'GET /api/v1/quote', input }), signed_at: new Date().toISOString(), signer: signer.address, algorithm: 'eip191-canonical-json-v1',
         payment: { proof: 'eip3009', network, asset: DEMO_ASSET, pay_to: payTo.address, payer: a.from, amount: a.value, nonce: a.nonce } } };
     const key = state.fault === 'bad-receipt' ? stranger : signer;
     if (key === stranger) body.receipt.signer = stranger.address;
-    body.receipt.signature = await key.signMessage({ message: canonical(body) });
+    if (receiptMode === 'unsigned') delete body.receipt; else body.receipt.signature = await key.signMessage({ message: canonical(body) });
     const settlement = { success: true, network, transaction: tx, payer: a.from };
     state.responses.set(a.nonce.toLowerCase(), { status: 200, body, settlement });
     if (state.fault === 'lost-response') throw new Error('socket hang up after settlement');

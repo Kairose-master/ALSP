@@ -14,6 +14,11 @@ function timestamp(value: unknown): number {
  */
 export async function verifyReceipt(call: Call, terms: Terms, pins: SignerPin[], p: ProviderProfile = DOCTOR_PROVIDER, now = Date.now()): Promise<ReceiptEvidence> {
   if (!call.wire || !call.prepared || call.wire.status !== 200) throw new Error('No successful JSON response');
+  if (p.receipt.mode === 'unsigned') {
+    // No provider signature exists: record the response digest; settlement is the only independent evidence.
+    canonical(call.wire.body);
+    return { requestId: `unsigned:${call.nonce}`, signer: 'none', signedAt: new Date(now).toISOString(), responseHash: digest(call.wire.body) };
+  }
   const body = object(call.wire.body), r = object(body.receipt);
   p.validateBody?.(body);
   if (r.algorithm !== 'eip191-canonical-json-v1' || r.route !== p.receipt.route || r.input_sha256 !== digest({ route: p.receipt.route, input: inputOf(call.input, p) })) throw new Error('Wrong algorithm or request binding');

@@ -4,6 +4,7 @@
 import { BrowserJournal, BrowserSessionClient, PROFILE, digest, injectedWallet, inputOf, serverApi, sha256Text, verifyChain } from './alsp-browser.js';
 import { createSimWorld, memoryStorage } from './sim.js';
 import { mountSessionWallet } from './session-wallet.js';
+import { isUnsigned, mountProviderPicker } from './providers.js';
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -15,7 +16,7 @@ const MISSIONS = {
   live: 'Run an x402 Doctor preflight on https://ichimoku-signal.fizzl.eu/signal/BTC-USDT and tell me whether it is safe to pay, with the reasons the service gave. Then end the session, export the archive and report the cost and the archive head hash.',
 };
 
-let meta = null, api = serverApi(''), wallet = null, mode = 'sandbox', payerMode = 'injected', sessionBox = null;
+let meta = null, api = serverApi(''), wallet = null, mode = 'sandbox', payerMode = 'injected', sessionBox = null, picker = null;
 const logLine = (text, cls = '') => { const el = document.createElement('div'); el.className = `entry ${cls}`; el.textContent = text; $('#transcript').appendChild(el); el.scrollIntoView({ block: 'end' }); };
 function setPayer(m) {
   payerMode = m; $('#sessionWalletBox').hidden = m !== 'session';
@@ -34,7 +35,7 @@ function currentProviderJson() { return JSON.parse($('#providerJson').value); }
 function setMode(m) {
   mode = m; document.body.dataset.mode = m;
   $('#mission').value = MISSIONS[m];
-  if (m === 'live' && meta) { const p = meta.presets['x402-doctor']; $('#providerJson').value = JSON.stringify(p, null, 2); $('#rpcUrl').value = meta.defaultRpc[p.network] ?? ''; }
+  if (m === 'live' && meta && !picker) picker = mountProviderPicker({ select: $('#preset'), json: $('#providerJson'), input: $('#input'), rpc: $('#rpcUrl'), discoverRow: $('#discoverRow'), url: $('#discoverUrl'), button: $('#discoverBtn'), note: $('#providerNote'), onChange: () => { $('#pin').value = ''; $('#signerDoc').textContent = ''; } }, { meta, api, log: (t, c) => logLine(t, c) });
 }
 async function connect() {
   try { wallet = injectedWallet(); const a = await wallet.connect(); $('#wallet').textContent = a; $('#connect').textContent = 'Connected'; } catch (e) { alert(e.message); }
@@ -119,8 +120,9 @@ async function start() {
   } else {
     const payer = payerMode === 'session' ? sessionBox?.wallet : wallet;
     if (!payer?.address) { log(payerMode === 'session' ? '<b>Session wallet not ready.</b>' : '<b>Connect a wallet first</b> (Live mode signs real USDC payments).', 'bad'); return; }
-    const pin = $('#pin').value.trim(); if (!pin) { log('<b>Enter the receipt signer pin</b> you verified independently.', 'bad'); return; }
-    provider = currentProviderJson(); providerWire = provider.id === 'x402-doctor' ? { id: provider.id } : provider; pins = [{ address: pin }]; rpcUrl = $('#rpcUrl').value.trim() || undefined; w = payer; a = api;
+    provider = currentProviderJson();
+    const pin = $('#pin').value.trim(); if (!pin && !isUnsigned(provider)) { log('<b>Enter the receipt signer pin</b> you verified independently (this provider signs receipts).', 'bad'); return; }
+    providerWire = provider.id === 'x402-doctor' ? { id: provider.id } : provider; pins = pin ? [{ address: pin }] : []; rpcUrl = $('#rpcUrl').value.trim() || undefined; w = payer; a = api;
     if (payerMode === 'session') { await sessionBox.refresh(); log(`<b>Disposable session wallet</b> ${esc(payer.address)} pays; the agent signs without prompts. Fund it with no more than this run may spend.`, 'warn'); }
   }
   const onStep = (step, c, err) => { if (step === 'error') { if (c) run.errors.set(c.id, err.message); log(`<span class="muted">journal:</span> ${esc(err.message)} → RECONCILIATION_REQUIRED`, 'warn'); } else if (step === 'reserved') log(`<span class="muted">journal:</span> reserved ${usdc(c.amount)} · nonce ${short(c.nonce)} · asking wallet to sign`, 'muted'); else if (step === 'submitting') log('<span class="muted">journal:</span> submission intent committed → sending once', 'muted'); renderJournal(); };
@@ -131,7 +133,7 @@ async function start() {
   const c = caps();
   const context = `Mode: ${mode === 'sandbox' ? 'SANDBOX (simulated provider and wallet; nothing real is paid, but the journal rules are real)' : 'LIVE (real provider, real USDC on ' + provider.network + ', every payment needs the human\'s wallet signature)'}.
 Provider: ${provider.label} · endpoint ${provider.origin}${provider.endpointPath} · payTo ${provider.payTo}.
-Request parameters this provider accepts: ${provider.id === 'x402-doctor' ? '{"url": "<https url to preflight>", "method": "GET"|"POST"}' : 'flat string map, e.g. {"symbol": "BTC-USDT"}'}.
+Request parameters this provider accepts: ${provider.id === 'x402-doctor' ? '{"url": "<https url to preflight>", "method": "GET"|"POST"}' : mode === 'live' ? `flat string map; the human prepared ${$('#input').value.trim() || '{}'}` : 'flat string map, e.g. {"symbol": "BTC-USDT"}'}.${mode === 'live' ? ` Receipts: ${isUnsigned(provider) ? 'UNSIGNED (verification = on-chain settlement only; the response is unattested)' : 'signed by a pinned key'}.` : ''}
 Payer: ${w.address}${mode === 'live' ? (payerMode === 'session' ? ' (disposable session wallet: you sign automatically; its USDC balance is the real limit)' : ' (the human\'s wallet signs each payment)') : ''}. Provider response lookup for reconciliation: ${recover ? 'available' : 'NOT available'}.
 Hard caps set by the human (atomic USDC; 1000 = 0.001 USDC): maxTotal ${c.maxTotal}, maxPerCall ${c.maxPerCall}, maxCalls ${c.maxCalls}. Stay at or below these.
 

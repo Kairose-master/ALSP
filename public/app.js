@@ -1,5 +1,6 @@
 import { BrowserJournal, BrowserSessionClient, PROFILE, canonical, digest, injectedWallet, inputOf, serverApi, sha256Text, verifyChain } from './alsp-browser.js';
 import { mountSessionWallet } from './session-wallet.js';
+import { isUnsigned, mountProviderPicker } from './providers.js';
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -25,14 +26,7 @@ function currentProvider() {
   if (!p || typeof p !== 'object') throw new Error('Provider profile must be a JSON object');
   return p;
 }
-function loadPreset(id) {
-  const p = id === 'custom' ? { id: 'my-provider', label: 'My x402 exact provider', origin: 'https://api.example.com', endpointPath: '/v1/paid', method: 'GET', signerPath: '/.well-known/x402-signer.json', network: 'eip155:8453', asset: { address: meta.presets['x402-doctor'].asset.address, name: 'USD Coin', version: '2' }, payTo: '0x0000000000000000000000000000000000000000', receipt: { route: 'GET /v1/paid', service: 'my-provider', certHeader: 'my-provider receipt signer' } } : meta.presets[id];
-  $('#providerJson').value = JSON.stringify(p, null, 2);
-  $('#input').value = id === 'x402-doctor' ? JSON.stringify({ url: meta.interopTarget, method: 'GET' }, null, 2) : JSON.stringify({ q: 'example' }, null, 2);
-  $('#rpcUrl').value = meta.defaultRpc[p.network] ?? '';
-  $('#pin').value = '';
-  $('#signerDoc').textContent = '';
-}
+let picker = null;
 async function fetchSigner() {
   try {
     setBusy(true);
@@ -70,8 +64,9 @@ async function createSession() {
 }
 function client() {
   const pin = $('#pin').value.trim();
-  if (!pin) throw new Error('Enter the independently checked receipt signer pin');
-  return new BrowserSessionClient(journal, { api, wallet: payerWallet(), pins: [{ address: pin }], rpcUrl: $('#rpcUrl').value.trim() || undefined, onStep: (step, c, err) => {
+  const unsigned = selected ? isUnsigned(journal.session(selected).provider) : isUnsigned(currentProvider());
+  if (!pin && !unsigned) throw new Error('Enter the independently checked receipt signer pin');
+  return new BrowserSessionClient(journal, { api, wallet: payerWallet(), pins: pin ? [{ address: pin }] : [], rpcUrl: $('#rpcUrl').value.trim() || undefined, onStep: (step, c, err) => {
     const label = { replay: 'Idempotent replay: persisted call returned, no new signature or payment', probe: 'Fetching 402 challenge (unpaid)', reserved: `Reserved ${c ? usdc(c.amount) : ''} and nonce ${c ? short(c.nonce, 12) : ''}; asking the wallet to sign`, submitting: 'Submission intent journaled; sending the signed authorization once', verifying: 'Verifying receipt signature and RPC settlement' }[step];
     if (step === 'error') log(`Call ${c ? short(c.id, 8) : ''}: ${err.message}. Funds stay reserved; nothing is retried automatically.`, 'bad'); else log(label);
   } });
@@ -159,16 +154,12 @@ async function renderSession() {
 
 // ---------- boot ----------
 $('#connect').onclick = connect; $('#create').onclick = createSession; $('#call').onclick = makeCall; $('#fetchSigner').onclick = fetchSigner;
-$('#preset').onchange = e => loadPreset(e.target.value);
 document.querySelectorAll('input[name=payer]').forEach(r => r.onchange = e => setPayer(e.target.value));
 $('#usePublishedSigner').onclick = () => { try { const d = JSON.parse($('#signerDoc').textContent); const a = d.signer ?? d.address ?? (Array.isArray(d.signers) ? (d.signers.find(x => x.status === 'current') ?? d.signers[0])?.address : undefined); if (!a) throw new Error('no signer field'); $('#pin').value = a; log('Pin copied from the published document. This is trust-on-first-use unless you verified it elsewhere.', 'warn'); } catch (e) { log(`Could not read a signer address: ${e.message}`, 'bad'); } };
 (async () => {
   try {
     meta = await api.meta();
-    const sel = $('#preset');
-    for (const p of Object.values(meta.presets)) { const o = document.createElement('option'); o.value = p.id; o.textContent = p.label; sel.appendChild(o); }
-    const custom = document.createElement('option'); custom.value = 'custom'; custom.textContent = 'Custom provider profile (JSON)'; sel.appendChild(custom);
-    loadPreset(Object.keys(meta.presets)[0]);
+    picker = mountProviderPicker({ select: $('#preset'), json: $('#providerJson'), input: $('#input'), rpc: $('#rpcUrl'), discoverRow: $('#discoverRow'), url: $('#discoverUrl'), button: $('#discoverBtn'), note: $('#providerNote'), onChange: () => { $('#pin').value = ''; $('#signerDoc').textContent = ''; } }, { meta, api, log });
     if (meta.allowedOrigins) log(`This deployment only proxies: ${meta.allowedOrigins.join(', ')}`);
     renderSessions(); renderSession();
     if (globalThis.ethereum) log('Wallet detected. Connect to begin.'); else log('No injected wallet detected. Install MetaMask (or any EIP-1193 wallet) on Base to pay.', 'warn');

@@ -36,7 +36,7 @@ test('atomic amounts use exact integers and reject suffixes, decimal, negative a
 });
 test('only exact v2 Base USDC and pinned payee/domain can be selected', () => {
   assert.equal(selectQuote(challenge(), terms(), input).accepted.amount, '1000');
-  for (const patch of [{ amount: '0' }, { amount: '1001' }, { amount: '0.001' }, { scheme: 'upto' }, { network: 'solana:mainnet' }, { asset: payer }, { payTo: payer }, { extra: { name: 'USD Coin', version: '2', assetTransferMethod: 'permit2' } }, { maxTimeoutSeconds: Infinity }, { maxTimeoutSeconds: 301 }]) {
+  for (const patch of [{ amount: '0' }, { amount: '1001' }, { amount: '0.001' }, { scheme: 'upto' }, { network: 'solana:mainnet' }, { asset: payer }, { payTo: payer }, { extra: { name: 'USD Coin', version: '2', assetTransferMethod: 'permit2' } }, { maxTimeoutSeconds: Infinity }, { maxTimeoutSeconds: 3601 }]) {
     assert.throws(() => selectQuote(challenge(patch), terms(), input));
   }
   for (const patch of [{ x402Version: 1 }, { resource: { url: 'https://evil.example/api/v1/preflight' } }, { resource: { url: `${DOCTOR}/wrong` } }, { accepts: {} }]) assert.throws(() => selectQuote({ ...challenge(), ...patch }, terms(), input));
