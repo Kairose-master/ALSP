@@ -7,7 +7,7 @@ import { createMockProvider } from './mock-provider.mjs';
 
 // Public throwaway buyer key. MUST NEVER be funded.
 const BUYER_KEY = `0x${'11'.repeat(32)}`;
-const memoryStorage = () => { const m = new Map(); return { getItem: k => m.get(k) ?? null, setItem: (k, v) => m.set(k, String(v)) }; };
+const memoryStorage = () => { const m = new Map(); return { getItem: k => m.get(k) ?? null, setItem: (k, v) => m.set(k, String(v)), removeItem: k => m.delete(k) }; };
 function sharedLocks() {
   const tails = new Map();
   return { request(name, _options, callback) {
@@ -182,4 +182,35 @@ test('verify route waits out transient settlement errors but not final ones', as
   const [rejected, why] = await handle('POST', '/api/x402/verify', JSON.stringify({ provider: providerJson, terms: h.terms, call: { ...c, verified: null }, pins: [{ address: h.mock.stranger }], rpcUrl: 'https://oracle.example/rpc' }), { fetchImpl: h.mock.fetchImpl, settleAttempts: 5, settleDelayMs: 1 });
   assert.equal(rejected, 400); assert.match(why.error, /Expected an object|Untrusted signing key|Pinned/, 'an unpinned signer without a certificate is final, not retried');
   void quote;
+});
+
+// ---------- disposable session wallet ----------
+import { sessionWallet, transferCalldata } from '../public/session-wallet.js';
+import { verifyTypedData } from 'viem';
+import { AUTHORIZATION_TYPES } from '../dist/index.js';
+test('session wallet signs valid EIP-3009 authorizations, sweeps and persists its key', async () => {
+  const storage = memoryStorage();
+  const w = sessionWallet(storage), again = sessionWallet(storage);
+  assert.equal(w.address, again.address, 'key persists in storage');
+  const quote = { accepted: { payTo: `0x${'bb'.repeat(20)}`, amount: '1000', maxTimeoutSeconds: 120, extra: { name: 'USD Coin', version: '2' } } };
+  const terms = { payer: w.address, network: 'eip155:8453', asset: `0x${'aa'.repeat(20)}`, expiresAt: Date.now() + 600000 };
+  const nonce = `0x${'77'.repeat(32)}`;
+  const p = await w.prepare(quote, terms, nonce);
+  const a = p.authorization;
+  assert.equal(await verifyTypedData({ address: w.address, domain: { name: 'USD Coin', version: '2', chainId: 8453, verifyingContract: terms.asset }, types: AUTHORIZATION_TYPES, primaryType: 'TransferWithAuthorization', signature: p.signature,
+    message: { from: a.from, to: a.to, value: BigInt(a.value), validAfter: BigInt(a.validAfter), validBefore: BigInt(a.validBefore), nonce: a.nonce } }), true);
+  await assert.rejects(w.prepare(quote, { ...terms, payer: `0x${'cc'.repeat(20)}` }, nonce), /not the session payer/);
+  const sweep = await w.sweepAuthorization({ to: `0x${'dd'.repeat(20)}`, value: '2500', chainId: 8453, asset: terms.asset });
+  assert.ok(sweep.calldata.startsWith('0xe3ee160e'), 'transferWithAuthorization(v,r,s) selector');
+  assert.equal(await verifyTypedData({ address: w.address, domain: { name: 'USD Coin', version: '2', chainId: 8453, verifyingContract: terms.asset }, types: AUTHORIZATION_TYPES, primaryType: 'TransferWithAuthorization', signature: sweep.signature, message: sweep.message }), true);
+  assert.ok(transferCalldata(w.address, '4000').startsWith('0xa9059cbb'), 'transfer selector');
+  assert.match(w.exportPrivateKey(), /^0x[0-9a-f]{64}$/);
+  w.forget(); assert.notEqual(sessionWallet(storage).address, w.address);
+});
+test('balance route reads balanceOf through the configured RPC', async () => {
+  const h = await harness();
+  const [status, data] = await handle('POST', '/api/x402/balance', JSON.stringify({ network: 'eip155:31337', asset: h.mock.profile.asset.address, address: h.wallet.address, rpcUrl: 'https://oracle.example/rpc' }), { fetchImpl: h.mock.fetchImpl });
+  assert.equal(status, 200); assert.equal(data.balance, '4000');
+  const [wrongChain] = await handle('POST', '/api/x402/balance', JSON.stringify({ network: 'eip155:8453', asset: h.mock.profile.asset.address, address: h.wallet.address, rpcUrl: 'https://oracle.example/rpc' }), { fetchImpl: h.mock.fetchImpl });
+  assert.equal(wrongChain, 400);
 });

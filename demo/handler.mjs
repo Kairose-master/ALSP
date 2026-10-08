@@ -3,7 +3,7 @@
 // fetch the 402 challenge, forward one signed payment, verify receipts/settlement, verify archives.
 // It never stores keys, authorizations or responses.
 import { agentEnabled, agentTurn, MODEL as AGENT_MODEL } from './agent.mjs';
-import { DOCTOR_PROVIDER, PROFILE, address, atomic, boundedFetch, canonical, defineProvider, digest, hash32, jsonRpc, object, providerJson, requestUrl, selectQuote, validatePrepared, validateTerms, verifyBuyerSeal, verifyChain, verifyReceipt, verifySettlement, x402Transport } from '../dist/index.js';
+import { DOCTOR_PROVIDER, PROFILE, address, atomic, boundedFetch, canonical, chainIdOf, defineProvider, digest, hash32, jsonRpc, object, providerJson, requestUrl, selectQuote, validatePrepared, validateTerms, verifyBuyerSeal, verifyChain, verifyReceipt, verifySettlement, x402Transport } from '../dist/index.js';
 
 const MAX_BODY = 512 * 1024;
 const PRESETS = { [DOCTOR_PROVIDER.id]: DOCTOR_PROVIDER };
@@ -65,6 +65,16 @@ export async function handle(method, path, rawBody, deps = {}) {
     const body = object(rawBody ? JSON.parse(rawBody) : {});
 
     if (path === '/api/agent/turn') return agentTurn(body, deps.agent ?? {});
+    if (path === '/api/x402/balance') {
+      // Read-only ERC-20 balanceOf through the configured RPC, for funding/sweeping a session wallet.
+      const network = String(body.network), asset = address(body.asset), who = address(body.address);
+      const rpc = rpcFor({ network }, body.rpcUrl, deps);
+      if (BigInt(chainIdOf(network)) !== BigInt(String(await rpc('eth_chainId', [])))) throw new Error('RPC chain does not match the requested network');
+      const data = `0x70a08231${who.slice(2).padStart(64, '0')}`;
+      const result = String(await rpc('eth_call', [{ to: asset, data }, 'latest']));
+      if (!/^0x[0-9a-fA-F]{0,64}$/.test(result)) throw new Error('Invalid balance response');
+      return [200, { balance: BigInt(result === '0x' ? '0x0' : result).toString() }];
+    }
     if (path === '/api/x402/signer') {
       // Unpaid: the provider's published signer document. Shown for review only; it never becomes a pin by itself.
       const p = resolveProvider(body.provider);

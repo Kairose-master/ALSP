@@ -28,6 +28,7 @@ button.primary{background:var(--accent);border-color:var(--accent);color:#fff;fo
 .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.hint{font-size:12px;color:var(--muted);margin:8px 0 0}.muted{color:var(--muted)}
 .modes{display:flex;gap:12px;font-size:14px}.modes label{display:flex;gap:6px;align-items:center;margin:0;color:var(--ink)}.modes input{width:auto}
 body[data-mode=sandbox] .live-only{display:none}
+.sw{border:1px dashed var(--line);border-radius:10px;padding:10px;margin-top:8px;font-size:13px}.sw .sw-addr,.sw .sw-bal{margin-bottom:6px}.sw input{width:auto}
 #transcript{min-height:300px;max-height:72vh;overflow:auto;display:flex;flex-direction:column;gap:8px}
 .entry{font-size:14px}.entry.muted{color:var(--muted);font-size:13px}.entry.warn{color:var(--warn)}.entry.bad{color:var(--bad)}.entry.ok{color:var(--ok)}
 .entry.mission pre{font:12px var(--mono);white-space:pre-wrap;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px;margin:4px 0 0}
@@ -69,6 +70,9 @@ code,.mono{font:11px var(--mono);word-break:break-all}pre{background:var(--bg);b
     <section class="panel live-only">
       <h2>Live settings</h2>
       <div class="actions" style="margin-top:0"><button id="connect">Connect wallet</button><span class="mono muted" id="wallet">not connected</span></div>
+      <label>Who pays</label>
+      <div class="modes"><label><input type="radio" name="payer" value="injected" checked> Connected wallet (signs every payment)</label><label><input type="radio" name="payer" value="session"> Disposable session wallet (agent signs itself)</label></div>
+      <div id="sessionWalletBox" class="sw" hidden></div>
       <label>Provider profile JSON</label><textarea id="providerJson" class="code" rows="8"></textarea>
       <div class="actions"><button id="fetchSigner">Fetch published signer</button><button id="usePublishedSigner">Use as pin</button></div><pre id="signerDoc" class="muted"></pre>
       <label>Receipt signer pin (verified independently)</label><input id="pin" placeholder="0x…">

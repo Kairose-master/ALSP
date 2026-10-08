@@ -3,6 +3,7 @@
 // and wallet; Live mode uses the real provider through the proxy and your wallet for signatures.
 import { BrowserJournal, BrowserSessionClient, PROFILE, digest, injectedWallet, inputOf, serverApi, sha256Text, verifyChain } from './alsp-browser.js';
 import { createSimWorld, memoryStorage } from './sim.js';
+import { mountSessionWallet } from './session-wallet.js';
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -14,7 +15,15 @@ const MISSIONS = {
   live: 'Run an x402 Doctor preflight on https://ichimoku-signal.fizzl.eu/signal/BTC-USDT and tell me whether it is safe to pay, with the reasons the service gave. Then end the session, export the archive and report the cost and the archive head hash.',
 };
 
-let meta = null, api = serverApi(''), wallet = null, mode = 'sandbox';
+let meta = null, api = serverApi(''), wallet = null, mode = 'sandbox', payerMode = 'injected', sessionBox = null;
+const logLine = (text, cls = '') => { const el = document.createElement('div'); el.className = `entry ${cls}`; el.textContent = text; $('#transcript').appendChild(el); el.scrollIntoView({ block: 'end' }); };
+function setPayer(m) {
+  payerMode = m; $('#sessionWalletBox').hidden = m !== 'session';
+  if (m === 'session' && !sessionBox) {
+    sessionBox = mountSessionWallet($('#sessionWalletBox'), { api, log: logLine, chain: () => { const p = currentProviderJson(); return { network: p.network, asset: p.asset, rpcUrl: $('#rpcUrl').value.trim() || undefined }; }, injected: () => wallet?.address ? { ethereum: globalThis.ethereum, address: wallet.address } : null });
+    sessionBox.refresh();
+  }
+}
 let run = null; // { journal, client, reconciler, sim, provider, providerWire, pins, rpcUrl, sessionId, messages, stopped, turns, tokens }
 
 const log = (html, cls = '') => { const el = document.createElement('div'); el.className = `entry ${cls}`; el.innerHTML = html; $('#transcript').appendChild(el); el.scrollIntoView({ block: 'end' }); return el; };
@@ -108,9 +117,11 @@ async function start() {
     sim = createSimWorld({ price: '1000', loseResponseOnCall: 2 });
     provider = sim.provider; providerWire = provider; pins = sim.pins; w = sim.wallet; a = sim.api; recover = sim.api.recover;
   } else {
-    if (!wallet?.address) { log('<b>Connect a wallet first</b> (Live mode signs real USDC payments).', 'bad'); return; }
+    const payer = payerMode === 'session' ? sessionBox?.wallet : wallet;
+    if (!payer?.address) { log(payerMode === 'session' ? '<b>Session wallet not ready.</b>' : '<b>Connect a wallet first</b> (Live mode signs real USDC payments).', 'bad'); return; }
     const pin = $('#pin').value.trim(); if (!pin) { log('<b>Enter the receipt signer pin</b> you verified independently.', 'bad'); return; }
-    provider = currentProviderJson(); providerWire = provider.id === 'x402-doctor' ? { id: provider.id } : provider; pins = [{ address: pin }]; rpcUrl = $('#rpcUrl').value.trim() || undefined; w = wallet; a = api;
+    provider = currentProviderJson(); providerWire = provider.id === 'x402-doctor' ? { id: provider.id } : provider; pins = [{ address: pin }]; rpcUrl = $('#rpcUrl').value.trim() || undefined; w = payer; a = api;
+    if (payerMode === 'session') { await sessionBox.refresh(); log(`<b>Disposable session wallet</b> ${esc(payer.address)} pays; the agent signs without prompts. Fund it with no more than this run may spend.`, 'warn'); }
   }
   const onStep = (step, c, err) => { if (step === 'error') { if (c) run.errors.set(c.id, err.message); log(`<span class="muted">journal:</span> ${esc(err.message)} → RECONCILIATION_REQUIRED`, 'warn'); } else if (step === 'reserved') log(`<span class="muted">journal:</span> reserved ${usdc(c.amount)} · nonce ${short(c.nonce)} · asking wallet to sign`, 'muted'); else if (step === 'submitting') log('<span class="muted">journal:</span> submission intent committed → sending once', 'muted'); renderJournal(); };
   const noPayments = async () => { throw new Error('Reconciliation cannot create or send a payment'); };
@@ -121,7 +132,7 @@ async function start() {
   const context = `Mode: ${mode === 'sandbox' ? 'SANDBOX (simulated provider and wallet; nothing real is paid, but the journal rules are real)' : 'LIVE (real provider, real USDC on ' + provider.network + ', every payment needs the human\'s wallet signature)'}.
 Provider: ${provider.label} · endpoint ${provider.origin}${provider.endpointPath} · payTo ${provider.payTo}.
 Request parameters this provider accepts: ${provider.id === 'x402-doctor' ? '{"url": "<https url to preflight>", "method": "GET"|"POST"}' : 'flat string map, e.g. {"symbol": "BTC-USDT"}'}.
-Payer: ${w.address}. Provider response lookup for reconciliation: ${recover ? 'available' : 'NOT available'}.
+Payer: ${w.address}${mode === 'live' ? (payerMode === 'session' ? ' (disposable session wallet: you sign automatically; its USDC balance is the real limit)' : ' (the human\'s wallet signs each payment)') : ''}. Provider response lookup for reconciliation: ${recover ? 'available' : 'NOT available'}.
 Hard caps set by the human (atomic USDC; 1000 = 0.001 USDC): maxTotal ${c.maxTotal}, maxPerCall ${c.maxPerCall}, maxCalls ${c.maxCalls}. Stay at or below these.
 
 Mission: ${$('#mission').value.trim()}`;
@@ -179,6 +190,7 @@ $('#stop').onclick = () => { if (run) run.stopped = true; };
 $('#connect').onclick = connect;
 $('#download').onclick = () => { if (!run?.archive) return; const blob = new Blob([JSON.stringify(run.archive, null, 2)], { type: 'application/json' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `alsp-agent-session-${run.sessionId}.json`; a.click(); };
 document.querySelectorAll('input[name=mode]').forEach(r => r.onchange = e => setMode(e.target.value));
+document.querySelectorAll('input[name=payer]').forEach(r => r.onchange = e => setPayer(e.target.value));
 const signerFromDoc = d => d?.signer ?? d?.address ?? (Array.isArray(d?.signers) ? (d.signers.find(x => x.status === 'current') ?? d.signers[0])?.address : undefined);
 $('#usePublishedSigner').onclick = () => { try { const a = signerFromDoc(JSON.parse($('#signerDoc').textContent)); if (!a) throw new Error('no signer address in the document'); $('#pin').value = a; log(`Pin set from the provider's published document: ${esc(a)}. This is trust-on-first-use; compare it with the provider's repository or docs before paying real money.`, 'warn'); } catch (e) { alert(`Fetch the published signer first (${e.message}).`); } };
 $('#fetchSigner').onclick = async () => { try { const r = await api.signer(currentProviderJson()); $('#signerDoc').textContent = r.signerDocument ? JSON.stringify(r.signerDocument, null, 2) : 'No signer document published.'; const d = r.signerDocument; const a = signerFromDoc(d); if (a && !$('#pin').value) $('#pin').placeholder = `published: ${a} (verify, then press Use as pin)`; } catch (e) { $('#signerDoc').textContent = e.message; } };

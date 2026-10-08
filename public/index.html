@@ -32,6 +32,8 @@ table{width:100%;border-collapse:collapse;font-size:13px}th,td{text-align:left;p
 code,.mono{font:12px var(--mono);word-break:break-all}details{margin-top:12px}summary{cursor:pointer;color:var(--muted);font-size:13px}
 pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px;overflow:auto;font:12px var(--mono);max-height:360px;margin:8px 0 0;white-space:pre-wrap}
 .empty{color:var(--muted);padding:20px 0;text-align:center}
+.modes{display:flex;gap:12px;font-size:13px;flex-wrap:wrap}.modes label{display:flex;gap:6px;align-items:center;margin:0;color:var(--ink)}.modes input{width:auto}
+.sw{border:1px dashed var(--line);border-radius:10px;padding:10px;margin-top:8px;font-size:13px}.sw .sw-addr,.sw .sw-bal{margin-bottom:6px}.sw input{width:auto}
 .sess{display:block;width:100%;text-align:left;margin-bottom:6px;line-height:1.35}.sess.active{border-color:var(--accent)}.sess small{color:var(--muted)}
 #log{max-height:260px;overflow:auto;font-size:13px}.log{padding:4px 0;border-top:1px solid var(--line)}.log.ok{color:var(--ok)}.log.bad{color:var(--bad)}.log.warn,.warn{color:var(--warn)}
 a{color:var(--accent)}
@@ -58,6 +60,9 @@ a{color:var(--accent)}
       <input id="pin" placeholder="0x…">
       <label>Read-only RPC URL for settlement checks (HTTPS)</label>
       <input id="rpcUrl" placeholder="https://mainnet.base.org">
+      <label>Who pays</label>
+      <div class="modes"><label><input type="radio" name="payer" value="injected" checked> Connected wallet</label><label><input type="radio" name="payer" value="session"> Disposable session wallet</label></div>
+      <div id="sessionWalletBox" class="sw" hidden></div>
     </section>
     <section class="panel">
       <h2>2 · Session terms</h2>

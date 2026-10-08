@@ -41,4 +41,4 @@ export function createSimWorld({ price = '1000', loseResponseOnCall = 2, latency
   const wallet = { address: SIM.PAYER, async prepare(q, terms, nonce, now) { await sleep(250 * latency); const s = Math.floor(now / 1000); return { quote: q, authorization: { from: SIM.PAYER, to: q.accepted.payTo, value: q.accepted.amount, nonce, validAfter: String(s - 5), validBefore: String(s + 120) }, signature: fakeHex(65) }; }, async signMessage() { await sleep(200 * latency); return fakeHex(65); } };
   return { world, api, wallet, provider: simProvider, pins: [{ address: SIM.SIGNER }] };
 }
-export const memoryStorage = () => { const m = new Map(); return { getItem: k => m.get(k) ?? null, setItem: (k, v) => m.set(k, String(v)) }; };
+export const memoryStorage = () => { const m = new Map(); return { getItem: k => m.get(k) ?? null, setItem: (k, v) => m.set(k, String(v)), removeItem: k => m.delete(k) }; };

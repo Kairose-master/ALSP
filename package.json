@@ -14,7 +14,8 @@
     "doctor:paid": "npm run build --silent && node examples/doctor/doctor.mjs paid",
     "doctor:reconcile": "npm run build --silent && node examples/doctor/doctor.mjs reconcile",
     "demo": "npm run build --silent && node demo/server.mjs",
-    "vercel-build": "npm run build"
+    "vercel-build": "npm run build",
+    "build:vendor": "esbuild demo/vendor-entry.mjs --bundle --format=esm --platform=browser --target=es2022 --minify --outfile=public/vendor/viem.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.131.0",
@@ -22,6 +23,7 @@
   },
   "devDependencies": {
     "@types/node": "22.15.30",
+    "esbuild": "^0.25.10",
     "typescript": "5.9.2"
   }
 }

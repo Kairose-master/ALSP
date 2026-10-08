@@ -245,6 +245,7 @@ export function serverApi(base = '') {
     send: (provider, terms, input, prepared, nonce) => post('/api/x402/send', { provider, terms, input, prepared, nonce }),
     verify: (provider, terms, call, pins, rpcUrl) => post('/api/x402/verify', { provider, terms, call, pins, rpcUrl }),
     verifyArchive: archive => post('/api/archive/verify', { archive }),
+    balance: ({ network, asset, address, rpcUrl }) => post('/api/x402/balance', { network, asset, address, rpcUrl }),
   };
 }
 const wireProvider = p => (p.id === 'x402-doctor' ? { id: p.id } : p);
