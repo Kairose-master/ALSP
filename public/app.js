@@ -94,7 +94,7 @@ async function reconcile(callId, withEvidence) {
 }
 async function endSession() { try { await journal.end(selected); log('Session ended'); } catch (e) { log(e.message, 'bad'); } renderSessions(); renderSession(); }
 async function resumeSession() { try { await journal.resume(selected); log('Session resumed within the original cap', 'ok'); } catch (e) { log(`Resume refused: ${e.message}`, 'bad'); } renderSessions(); renderSession(); }
-function forgetSession() { try { if (!confirm('Delete this session\'s local journal? Only possible when every call is VERIFIED. Export the archive first.')) return; journal.forget(selected); selected = null; log('Local journal deleted'); } catch (e) { log(e.message, 'bad'); } renderSessions(); renderSession(); }
+async function forgetSession() { try { if (!confirm('Delete this session\'s local journal? Only possible when every call is VERIFIED. Export the archive first.')) return; await journal.forget(selected); selected = null; log('Local journal deleted'); } catch (e) { log(e.message, 'bad'); } renderSessions(); renderSession(); }
 async function exportArchive(seal) {
   try {
     const report = await journal.export(selected);
