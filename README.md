@@ -12,10 +12,11 @@ Core does not prescribe a payment rail or require an on-chain registry. The x402
 
 ## Current validation level
 
-- TypeScript reference implementation and local tests are available.
-- Tests exercise EIP-191/EIP-712 signatures and local HTTP behavior, but use **mock ledger evidence**.
-- `doctor:probe` checks the live public 402 challenge and signer metadata without paying. It is a compatibility probe only.
-- There is no paid mainnet interoperability run in this `main` baseline. Do not describe the implementation as live-settlement validated.
+- **Local / mocked ledger:** TypeScript tests exercise EIP-191/EIP-712 signatures and local HTTP behavior with **mock ledger evidence**, not mainnet settlement.
+- **Free probe:** `doctor:probe` checks the live public 402 challenge and signer metadata without paying. It is a compatibility probe only.
+- **Buyer-side paid Base/USDC run:** [PR #7](https://github.com/Kairose-master/ALSP/pull/7) records three ordinary x402 `exact` payments grouped into one bounded ALSP session, independent settlement verification for all three, reconciliation of uncertain outcomes without replacement payments, and closure with zero unresolved calls. No additional registry transactions were required. This is buyer-side live-payment evidence; provider-side cross-check remains pending.
+- **Browser client:** [PR #9](https://github.com/Kairose-master/ALSP/pull/9) adds the wallet-signed client and stateless proxy. `test/demo.test.mjs` exercises the browser journal, replay, reconciliation and archive verification in Node with a mock provider/ledger. [PR #10](https://github.com/Kairose-master/ALSP/pull/10) adds corrupt/inaccessible-storage and competing-reservation regressions with an injected shared lock manager. These are not a browser mainnet paid run or an actual multi-tab browser test.
+- **Unverified:** provider-side correlation/assent, fully verified bilateral interoperability, and x402 standards adoption. ALSP remains an experimental proposal/profile. See the [validation record](docs/INTEROP-001.md#validation-record-as-of-2026-10-08) for evidence boundaries.
 - `contracts/license/experimental/ALSPRegistry.sol` is an unaudited legacy sketch. The x402 Exact profile does not invoke it, and Core does not require it.
 
 ## Doctor x402 Exact reference
@@ -45,7 +46,7 @@ The runner persists reservation, nonce, signed authorization, submission intent,
 `public/` is a browser client for the same profile, and `api/index.js` / `demo/server.mjs` expose a **stateless** proxy + verifier built from the library. Design:
 
 - **Your wallet signs.** Each EIP-3009 `TransferWithAuthorization` is signed by an injected EIP-1193 wallet (MetaMask etc.) with `eth_signTypedData_v4`; the buyer seal uses `personal_sign`. No server ever sees a private key.
-- **Your browser keeps the journal.** `public/alsp-browser.js` mirrors the Node journal (reserve → authorized → submission intent → response → verified, same budgets, same hash chain) in `localStorage`, one atomic write per transition, committed before the network side effect. Exported archives verify with the library's `verifyChain` / `verifyBuyerSeal`.
+- **Your browser keeps the journal.** `public/alsp-browser.js` mirrors the Node journal (reserve → authorized → submission intent → response → verified, same budgets, same hash chain) in `localStorage`. Read/modify/write transitions are serialized across same-origin tabs with Web Locks and persisted before the network side effect; corrupt/inaccessible storage or unavailable browser locks fail closed. Exported archives verify with the library's `verifyChain` / `verifyBuyerSeal`.
 - **The server is replaceable.** It only fetches the 402 challenge, forwards one signed payment, runs `verifyReceipt` + `verifySettlement`, and checks archives. It stores nothing. Run your own: anything you proxy through sees the bearer authorization in transit.
 - **Any provider.** A `ProviderProfile` (origin, paid path, network, asset, payout address, receipt binding) replaces the former hard-coded Doctor constants; `DOCTOR_PROVIDER` is the preset. Custom profiles get generic request/body validation; providers must emit the `eip191-canonical-json-v1` receipt format.
 

@@ -6,6 +6,21 @@ A single session records multiple ordinary Doctor preflight calls, enforces a lo
 
 This does not demonstrate batch settlement, pre-funded authorization, Solana support, provider license assent or semantically correct diagnoses.
 
+## Validation record (as of 2026-10-08)
+
+| Evidence level | Recorded result | Boundary |
+| --- | --- | --- |
+| Local / mocked ledger | TypeScript/local HTTP tests exercise EIP-191/EIP-712 signatures with fabricated ledger evidence. | No mainnet settlement is proved by these tests. |
+| Free live probe | `doctor:probe` checks the public 402 challenge and published signer metadata without payment credentials. | Challenge compatibility only; not a paid session. |
+| Buyer-side paid Base/USDC | [PR #7](https://github.com/Kairose-master/ALSP/pull/7) records three x402 `exact` payments grouped into one bounded ALSP session; all three settlements independently verified; uncertain outcomes reconciled without replacement payments; session closed with zero unresolved calls; no additional registry transactions. | Buyer-side live-payment/settlement verification. Provider-side cross-check remains pending. |
+| Browser client / mocked ledger | [PR #9](https://github.com/Kairose-master/ALSP/pull/9) adds the wallet-signed browser client/stateless proxy. `test/demo.test.mjs` exercises replay, reconciliation and archive verification in Node with a mock provider/ledger and fixture signatures. [PR #10](https://github.com/Kairose-master/ALSP/pull/10) adds corrupt/inaccessible-storage and competing-reservation regressions using an injected shared lock manager. | No browser mainnet paid run or actual multi-tab browser test is established by these tests. Current browser writes use same-origin Web Locks and fail closed when locks are unavailable. |
+
+The paid result is the buyer-side run already recorded in PR #7 and the [upstream issue draft](X402-PROPOSAL.md#upstream-issue-draft), not a new execution for this documentation update. Provider-side correlation and explicit ALSP terms assent remain unverified; fully verified bilateral interoperability and x402 standard adoption are not claimed.
+
+Receipt signatures establish server provenance/request binding, not semantic service correctness. RPC-confirmed settlement is evidence from the configured RPC, not a trustless light-client proof or absolute finality. A buyer-sealed archive establishes local-record integrity, not provider assent, completeness or billing fairness. No registry write or final-head anchoring is implemented in the x402 Exact profile. The run does not validate batch settlement, pre-funded authorization, Solana support or the legacy License Profile.
+
+The steps below are a runbook for separately authorized future trials, not evidence that every current client has completed a paid run.
+
 ## 1. No-money check
 
 ```bash
@@ -71,4 +86,4 @@ After the trial, share only reviewed non-secret evidence for each call: UTC time
 
 Send the exact commit/PR, Node version, immutable terms digest, intended call count/cap and whether the test is **unpaid**, **local/mocked ledger**, or **real paid Base**. After a real trial, report verified transaction hashes and any failure without exposing wallet keys or unspent authorization signatures.
 
-Initial implementation status: see the PR's CI evidence. Never claim the paid interop has run merely because the reference or unpaid probe passes.
+Current validation status: see the validation record above. The recorded buyer-side paid run is distinct from local tests, the unpaid probe and browser-client tests; passing those checks does not establish another paid run or provider-side interoperability.
