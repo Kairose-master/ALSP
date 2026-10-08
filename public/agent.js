@@ -2,7 +2,7 @@
 // here, in the browser, on the real journal. Sandbox mode uses the in-page simulated provider
 // and wallet; Live mode uses the real provider through the proxy and your wallet for signatures.
 import { BrowserJournal, BrowserSessionClient, PROFILE, digest, injectedWallet, inputOf, serverApi, sha256Text, verifyChain } from './alsp-browser.js';
-import { createSimWorld, memoryStorage } from './sim.js';
+import { createSimWorld, memoryStorage, naiveRun } from './sim.js';
 import { mountSessionWallet } from './session-wallet.js';
 import { isUnsigned, mountProviderPicker } from './providers.js';
 
@@ -11,8 +11,9 @@ const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '
 const short = (s, n = 12) => s ? `${String(s).slice(0, n)}…` : '—';
 const usdc = a => `${(Number(a) / 1e6).toFixed(6).replace(/0+$/, '').replace(/\.$/, '')} USDC`;
 const MAX_TURNS = 24;
+const PRODUCT = ['BTC-USDT', 'ETH-USDT', 'SOL-USDT', 'DOGE-USDT', 'AVAX-USDT'];
 const MISSIONS = {
-  sandbox: 'Buy spot quotes for BTC-USDT, ETH-USDT and SOL-USDT from the oracle. Handle any failure without ever paying twice. Then end the session, export the archive and report what you bought, what it cost and the archive head hash.',
+  sandbox: `Build a price sheet for ${PRODUCT.join(', ')} from the oracle: one paid quote per symbol (keys like quote-btc). Handle any failure without ever paying twice and stay inside the caps. Then end the session, export the archive and report the sheet, the total cost, anything unresolved and the archive head hash.`,
   live: 'Run an x402 Doctor preflight on https://ichimoku-signal.fizzl.eu/signal/BTC-USDT and tell me whether it is safe to pay, with the reasons the service gave. Then end the session, export the archive and report the cost and the archive head hash.',
 };
 
@@ -35,7 +36,7 @@ function currentProviderJson() { return JSON.parse($('#providerJson').value); }
 function setMode(m) {
   mode = m; document.body.dataset.mode = m;
   $('#mission').value = MISSIONS[m];
-  if (m === 'live' && meta && !picker) picker = mountProviderPicker({ select: $('#preset'), json: $('#providerJson'), input: $('#input'), rpc: $('#rpcUrl'), discoverRow: $('#discoverRow'), url: $('#discoverUrl'), button: $('#discoverBtn'), note: $('#providerNote'), onChange: () => { $('#pin').value = ''; $('#signerDoc').textContent = ''; } }, { meta, api, log: (t, c) => logLine(t, c) });
+  if (m === 'live' && meta && !picker) picker = mountProviderPicker({ select: $('#preset'), json: $('#providerJson'), input: $('#input'), rpc: $('#rpcUrl'), discoverRow: $('#discoverRow'), url: $('#discoverUrl'), button: $('#discoverBtn'), note: $('#providerNote'), onChange: (_p, t) => { $('#pin').value = ''; $('#signerDoc').textContent = ''; if (t?.caps) { $('#maxTotal').value = t.caps.maxTotal; $('#maxPerCall').value = t.caps.maxPerCall; $('#maxCalls').value = t.caps.maxCalls; } if (t?.mission && mode === 'live') $('#mission').value = t.mission; } }, { meta, api, log: (t, c) => logLine(t, c) });
 }
 async function connect() {
   try { wallet = injectedWallet(); const a = await wallet.connect(); $('#wallet').textContent = a; $('#connect').textContent = 'Connected'; } catch (e) { alert(e.message); }
@@ -170,7 +171,29 @@ Mission: ${$('#mission').value.trim()}`;
     if (run.stopped) log('<b>Stopped by the human.</b> The journal keeps every reservation; nothing was retried.', 'warn');
     else if (run.turns >= MAX_TURNS) log(`<b>Turn limit (${MAX_TURNS}) reached.</b>`, 'warn');
     else log('<b>Agent finished.</b>', 'ok');
+    if (mode === 'sandbox' && run.sessionId) await renderComparison();
   } finally { run.done = true; $('#start').disabled = false; $('#stop').disabled = true; renderJournal(); }
+}
+// ---------- the same product without ALSP ----------
+async function renderComparison() {
+  const panel = $('#comparePanel'), el = $('#compare');
+  panel.hidden = false; el.innerHTML = '<span class="spinner"></span> replaying the same product with a plain x402 retry loop…';
+  const symbols = run.journal.calls(run.sessionId).map(c => c.input.symbol);
+  const naive = await naiveRun({ symbols: symbols.length ? symbols : PRODUCT, price: '1000', loseResponseOnCall: 2 });
+  const report = await run.journal.export(run.sessionId), s = run.journal.session(run.sessionId);
+  const alsp = { payments: run.sim.world.paid, spent: report.summary.allocatedTotal, verified: report.summary.verifiedSpent, doublePaid: run.sim.world.paid - run.journal.calls(run.sessionId).length, unresolved: report.summary.unresolved, events: report.events.length, head: report.headHash, cap: s.terms.maxTotal };
+  const row = (label, a, b, good) => `<tr><th>${label}</th><td class="${good === 'a' ? 'good' : good === 'b' ? 'badc' : ''}">${a}</td><td class="${good === 'a' ? 'badc' : good === 'b' ? 'good' : ''}">${b}</td></tr>`;
+  el.innerHTML = `<p class="hint">Same ${symbols.length || PRODUCT.length}-symbol price sheet, same price, same lost response on the 2nd call. Left: a plain x402 client that retries on error. Right: this ALSP session.</p>
+    <table class="cmp"><thead><tr><th></th><th>Plain x402 retry loop</th><th>ALSP session</th></tr></thead><tbody>
+    ${row('Payments settled by the provider', naive.payments, alsp.payments, naive.payments > alsp.payments ? 'b' : '')}
+    ${row('USDC spent', usdc(naive.spent), usdc(alsp.spent), BigInt(naive.spent) > BigInt(alsp.spent) ? 'b' : '')}
+    ${row('Paid twice for one answer', naive.doublePaid, alsp.doublePaid, naive.doublePaid > alsp.doublePaid ? 'b' : '')}
+    ${row('Spend cap', 'none (the loop keeps paying)', `${usdc(alsp.cap)} enforced before signing`, 'b')}
+    ${row('Lost response handled by', 'paying again', 'reconciling the original evidence', 'b')}
+    ${row('Answers without a verified payment', naive.rows.filter(r => !r.got).length, alsp.unresolved, '')}
+    ${row('Evidence left behind', 'none', `${alsp.events}-event hash chain, head ${short(alsp.head, 14)}, exportable and sealable`, 'b')}
+    </tbody></table>
+    <p class="hint">Scale it: a 1,000-call job with a 1% timeout rate overpays ~10 times and nobody can prove what was bought. With a session the cap is a hard stop, every retry is free, and the archive is the invoice.</p>`;
 }
 function setStats(model) { $('#stats').textContent = `turn ${run.turns}/${MAX_TURNS} · ${run.tokens} tokens${model ? ` · ${model}` : ''}`; }
 

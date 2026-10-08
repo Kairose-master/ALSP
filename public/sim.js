@@ -42,3 +42,28 @@ export function createSimWorld({ price = '1000', loseResponseOnCall = 2, latency
   return { world, api, wallet, provider: simProvider, pins: [{ address: SIM.SIGNER }] };
 }
 export const memoryStorage = () => { const m = new Map(); return { getItem: k => m.get(k) ?? null, setItem: (k, v) => m.set(k, String(v)), removeItem: k => m.delete(k) }; };
+
+/**
+ * What a plain x402 client does for the same product: no terms, no cap, no journal, retry on error.
+ * Runs against a fresh simulated world with the same price and the same lost response, so the
+ * difference with the session run is only the protocol, not luck.
+ */
+export async function naiveRun({ symbols, price = '1000', loseResponseOnCall = 2, maxRetries = 2, latency = 0 } = {}) {
+  const sim = createSimWorld({ price, loseResponseOnCall, latency });
+  const rows = [];
+  for (const symbol of symbols) {
+    let response = null, attempts = 0, error = null;
+    while (!response && attempts <= maxRetries) {
+      attempts++;
+      try {
+        const { quote } = await sim.api.probe();
+        const nonce = `0x${Array.from(crypto.getRandomValues(new Uint8Array(32)), b => b.toString(16).padStart(2, '0')).join('')}`;
+        const prepared = await sim.wallet.prepare(quote, { expiresAt: Date.now() + 600000 }, nonce, Date.now());
+        response = (await sim.api.send(null, null, { symbol }, prepared, nonce)).wire; // a timeout here looks like "not paid" to a naive client
+      } catch (e) { error = e.message; }
+    }
+    rows.push({ symbol, attempts, got: Boolean(response), error: response ? null : error });
+  }
+  const paid = sim.world.paid;
+  return { rows, payments: paid, spent: (BigInt(price) * BigInt(paid)).toString(), doublePaid: paid - rows.filter(r => r.got).length, evidence: 'none', cap: 'none' };
+}

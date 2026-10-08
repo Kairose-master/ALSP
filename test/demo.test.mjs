@@ -242,3 +242,30 @@ test('discovery builds an unsigned profile from a live 402 and refuses unsafe ta
   const [, meta] = await handle('GET', '/api/meta', '');
   assert.ok(meta.templates.length >= 5); assert.ok(TEMPLATES.every(t => t.url.startsWith('https://')));
 });
+
+// ---------- the "why a session" comparison ----------
+import { naiveRun } from '../public/sim.js';
+test('a plain x402 retry loop pays twice for a lost response and has no cap; the session does neither', async () => {
+  const symbols = ['BTC-USDT', 'ETH-USDT', 'SOL-USDT', 'DOGE-USDT', 'AVAX-USDT'];
+  const naive = await naiveRun({ symbols, price: '1000', loseResponseOnCall: 2 });
+  assert.equal(naive.payments, 6); assert.equal(naive.doublePaid, 1); assert.equal(naive.spent, '6000'); assert.ok(naive.rows.every(r => r.got));
+  const h = await harness({ price: '1000' });
+  // Same product under a 5-call, 0.005 USDC session with the same lost response on the 2nd call.
+  const terms = { ...h.terms, maxTotal: '5000', maxCalls: 5 };
+  const sessionId = await h.journal.create(terms, JSON.parse(JSON.stringify(h.mock.profile)));
+  let n = 0;
+  const originalSend = h.mock.fetchImpl;
+  for (const symbol of symbols) {
+    n++; h.mock.setFault(n === 2 ? 'lost-response' : 'none');
+    await h.client.call(sessionId, `quote-${symbol.toLowerCase()}`, { symbol });
+  }
+  h.mock.setFault('none');
+  const lost = h.journal.calls(sessionId).find(c => c.state !== 'VERIFIED');
+  assert.ok(lost, 'the lost response is parked, not retried');
+  assert.equal((await h.client.reconcile(lost.id, h.mock.recover(lost.nonce))).state, 'VERIFIED');
+  const report = await h.journal.export(sessionId);
+  assert.equal(h.mock.state.paid, 5); assert.equal(report.summary.allocatedTotal, '5000'); assert.equal(report.summary.unresolved, 0);
+  await assert.rejects(h.client.call(sessionId, 'quote-extra', { symbol: 'XRP-USDT' }), /policy|budget/i);
+  assert.equal(h.mock.state.paid, 5, 'the cap refused a 6th payment before any signature');
+  void originalSend;
+});
