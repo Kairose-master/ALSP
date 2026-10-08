@@ -51,7 +51,7 @@ export const inputOf = (value, provider) => (provider.id === 'x402-doctor' ? doc
 // ---------- journal ----------
 const KEY = 'alsp:v1';
 const LOCK = `${KEY}:write`;
-const empty = () => ({ sessions: {}, receipts: {}, payments: {} });
+const empty = () => ({ sessions: {}, receipts: {}, payments: {}, missions: {} });
 let localWriteQueue = Promise.resolve();
 export class BrowserJournal {
   constructor(storage = globalThis.localStorage, locks = globalThis.navigator?.locks) { this.storage = storage; this.locks = locks; }
@@ -62,7 +62,8 @@ export class BrowserJournal {
     let db;
     try { if (typeof raw !== 'string') throw new Error('Storage value is not text'); db = JSON.parse(raw); } catch (cause) { throw new Error('Journal data is corrupted; refusing to continue without payment history', { cause }); }
     const record = value => value && typeof value === 'object' && !Array.isArray(value) && [Object.prototype, null].includes(Object.getPrototypeOf(value));
-    if (!record(db) || !record(db.sessions) || !record(db.receipts) || !record(db.payments)) {
+    if (record(db) && db.missions === undefined) db.missions = {};
+    if (!record(db) || !record(db.sessions) || !record(db.receipts) || !record(db.payments) || !record(db.missions)) {
       throw new Error('Journal data is invalid; refusing to continue without payment history');
     }
     for (const [id, s] of Object.entries(db.sessions)) {
@@ -87,17 +88,58 @@ export class BrowserJournal {
     await previous;
     try { return await fn(); } finally { release(); }
   }
-  list() { return Object.values(this.load().sessions).sort((a, b) => b.createdAt - a.createdAt).map(s => ({ id: s.id, state: s.state, createdAt: s.createdAt, providerId: s.provider.id, payer: s.terms.payer, calls: s.calls.length, unresolved: s.calls.filter(c => c.state !== 'VERIFIED').length })); }
+  list() { return Object.values(this.load().sessions).sort((a, b) => b.createdAt - a.createdAt).map(s => ({ id: s.id, missionId: s.missionId ?? null, state: s.state, createdAt: s.createdAt, providerId: s.provider.id, payer: s.terms.payer, calls: s.calls.length, unresolved: s.calls.filter(c => c.state !== 'VERIFIED').length })); }
   session(id, db = this.load()) { const s = db.sessions[id]; if (!s) throw new Error('Unknown session'); return s; }
   calls(id) { return this.session(id).calls; }
   call(id, db = this.load()) { for (const s of Object.values(db.sessions)) { const c = s.calls.find(c => c.id === id); if (c) return c; } throw new Error('Unknown call'); }
-  async create(terms, provider, now = Date.now()) {
+  async create(terms, provider, now = Date.now(), { missionId = null } = {}) {
     if (terms.expiresAt <= now) throw new Error('Session already expired');
     return this.withWriteLock(async () => {
       const db = this.load(), id = crypto.randomUUID();
-      db.sessions[id] = { id, terms, provider, state: 'ACTIVE', head: await digest({ profile: PROFILE, sessionId: id, terms }), seq: 0, createdAt: now, events: [], calls: [] };
+      let m = null;
+      if (missionId) {
+        m = this.mission(missionId, db);
+        if (m.state !== 'ACTIVE') throw new Error('Mission is not active');
+        if (lower(m.payer) !== lower(terms.payer) || m.network !== terms.network) throw new Error('Session payer/network must match the mission');
+        if (atomic(terms.maxTotal) > atomic(m.maxTotal)) throw new Error('Session cap exceeds the mission cap');
+      }
+      db.sessions[id] = { id, terms, provider, missionId, state: 'ACTIVE', head: await digest({ profile: PROFILE, sessionId: id, terms }), seq: 0, createdAt: now, events: [], calls: [] };
+      if (m) { m.sessions.push(id); await this.appendMission(m, { kind: 'session_linked', sessionId: id, termsHash: await digest(terms), providerId: provider.id, endpoint: terms.endpoint, maxTotal: terms.maxTotal }); }
       this.save(db); return id;
     });
+  }
+  // ---------- missions: one cap across several provider sessions ----------
+  mission(id, db = this.load()) { const m = db.missions[id]; if (!m) throw new Error('Unknown mission'); return m; }
+  listMissions() { return Object.values(this.load().missions).sort((a, b) => b.createdAt - a.createdAt).map(m => ({ id: m.id, label: m.label, state: m.state, maxTotal: m.maxTotal, sessions: m.sessions.length, createdAt: m.createdAt })); }
+  missionAllocated(m, db) { return m.sessions.reduce((t, sid) => t + (db.sessions[sid]?.calls ?? []).reduce((u, c) => u + atomic(c.amount), 0n), 0n); }
+  async appendMission(m, event) {
+    const seq = m.seq + 1, head = await digest({ profile: PROFILE, missionId: m.id, seq, previous: m.head, event });
+    m.events.push({ seq, previous: m.head, head, event }); m.seq = seq; m.head = head;
+  }
+  async createMission({ label, maxTotal, payer, network }, now = Date.now()) {
+    atomic(maxTotal); lower(payer);
+    return this.withWriteLock(async () => {
+      const db = this.load(), id = crypto.randomUUID(), terms = { label: String(label), maxTotal, payer, network, createdAt: now };
+      db.missions[id] = { id, ...terms, state: 'ACTIVE', head: await digest({ profile: PROFILE, missionId: id, terms }), seq: 0, sessions: [], events: [] };
+      this.save(db); return id;
+    });
+  }
+  async endMission(id) {
+    return this.withWriteLock(async () => {
+      const db = this.load(), m = this.mission(id, db);
+      if (m.state !== 'ACTIVE') return;
+      for (const sid of m.sessions) { const s = db.sessions[sid]; if (s && s.state === 'ACTIVE') { s.state = 'ENDED'; await this.append(s, { kind: 'access_ended' }); } }
+      for (const sid of m.sessions) { const s = db.sessions[sid]; if (s) await this.appendMission(m, { kind: 'session_head', sessionId: sid, headHash: s.head, calls: s.calls.length, allocated: s.calls.reduce((t, c) => t + atomic(c.amount), 0n).toString(), unresolved: s.calls.filter(c => c.state !== 'VERIFIED').length }); }
+      m.state = 'ENDED'; await this.appendMission(m, { kind: 'mission_ended' }); this.save(db);
+    });
+  }
+  async exportMission(id) {
+    const db = this.load(), m = this.mission(id, db);
+    const sessions = []; for (const sid of m.sessions) sessions.push({ provider: db.sessions[sid].provider, ...(await this.export(sid)) });
+    const allocated = this.missionAllocated(m, db).toString(), verified = sessions.reduce((t, x) => t + BigInt(x.summary.verifiedSpent), 0n).toString(), unresolved = sessions.reduce((t, x) => t + x.summary.unresolved, 0), calls = sessions.reduce((t, x) => t + x.summary.calls, 0);
+    const terms = { label: m.label, maxTotal: m.maxTotal, payer: m.payer, network: m.network, createdAt: m.createdAt };
+    return { profile: PROFILE, kind: 'mission', missionId: id, terms, termsHash: await digest(terms), headHash: m.head, events: m.events.map(e => ({ seq: e.seq, previous: e.previous, head: e.head, event: e.event })),
+      summary: { state: m.state === 'ACTIVE' ? 'ACTIVE' : unresolved ? 'RECONCILIATION_REQUIRED' : 'CLOSED', maxTotal: m.maxTotal, allocatedTotal: allocated, verifiedSpent: verified, unresolved, calls, sessions: sessions.length, providers: sessions.map(x => x.provider.id) }, sessions };
   }
   async append(s, event) {
     const seq = s.seq + 1, head = await digest({ profile: PROFILE, sessionId: s.id, seq, previous: s.head, event });
@@ -120,6 +162,7 @@ export class BrowserJournal {
       if (s.state !== 'ACTIVE' || now >= s.terms.expiresAt) throw new Error('Session not active');
       if (amount <= 0n || amount > atomic(s.terms.maxPerCall) || s.calls.length >= s.terms.maxCalls) throw new Error('Per-call policy exceeded');
       if (s.calls.reduce((sum, c) => sum + atomic(c.amount), 0n) + amount > atomic(s.terms.maxTotal)) throw new Error('Session budget exceeded');
+      if (s.missionId) { const m = this.mission(s.missionId, db); if (m.state !== 'ACTIVE') throw new Error('Mission not active'); if (this.missionAllocated(m, db) + amount > atomic(m.maxTotal)) throw new Error('Mission budget exceeded'); }
       const nonce = randomNonce(), paymentId = `${s.terms.network}:${s.terms.asset.toLowerCase()}:${s.terms.payer.toLowerCase()}:${nonce}`;
       if (db.payments[paymentId]) throw new Error('Nonce collision');
       const c = { id: crypto.randomUUID(), sessionId, requestKey: key, requestHash: await digest({ endpoint: s.terms.endpoint, input: inputOf(input, s.provider) }), input, quote, amount: amount.toString(), nonce, createdAt: now, state: 'RESERVED', prepared: null, wire: null, verified: null };
@@ -182,6 +225,25 @@ export class BrowserJournal {
       delete db.sessions[sessionId]; this.save(db);
     });
   }
+}
+/** Mission archive check: its own chain, every session archive's chain, and the session heads it committed to. */
+export async function verifyMissionChain(archive) {
+  try {
+    if (archive.profile !== PROFILE || archive.kind !== 'mission' || archive.termsHash !== await digest(archive.terms)) return false;
+    let head = await digest({ profile: PROFILE, missionId: archive.missionId, terms: archive.terms });
+    for (const [i, r] of archive.events.entries()) {
+      if (r.seq !== i + 1 || r.previous !== head) return false;
+      head = await digest({ profile: PROFILE, missionId: archive.missionId, seq: r.seq, previous: head, event: r.event });
+      if (head !== r.head) return false;
+    }
+    if (head !== archive.headHash) return false;
+    for (const s of archive.sessions) {
+      if (!(await verifyChain(s))) return false;
+      const committed = archive.events.filter(e => e.event.kind === 'session_head' && e.event.sessionId === s.sessionId).pop();
+      if (committed && committed.event.headHash !== s.headHash) return false;
+    }
+    return true;
+  } catch { return false; }
 }
 /** Same chain rule as the library's verifyChain, for a local self-check. */
 export async function verifyChain(archive) {
@@ -247,6 +309,7 @@ export function serverApi(base = '') {
     verifyArchive: archive => post('/api/archive/verify', { archive }),
     balance: ({ network, asset, address, rpcUrl }) => post('/api/x402/balance', { network, asset, address, rpcUrl }),
     discover: url => post('/api/x402/discover', { url }),
+    logs: { put: entry => post('/api/logs', entry), list: async (limit = 100) => (await fetch(`${base}/api/logs?limit=${limit}`)).json(), get: async id => (await fetch(`${base}/api/logs/${encodeURIComponent(id)}`)).json() },
   };
 }
 const wireProvider = p => (p.id === 'x402-doctor' ? { id: p.id } : p);

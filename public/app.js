@@ -140,13 +140,14 @@ async function renderSession() {
     <p class="hint">Session <span class="mono">${esc(selected)}</span> · payer ${short(s.terms.payer, 12)} → ${esc(s.provider.label)} (${short(s.terms.provider, 12)}) · ${esc(s.terms.network)} · terms hash ${short(report.termsHash, 16)} · head ${short(report.headHash, 16)}</p>
     <div class="actions">
       ${s.state === 'ACTIVE' ? '<button data-busy id="end">End session</button>' : '<button data-busy id="resume">Resume</button>'}
-      <button data-busy id="exportPlain">Export archive</button><button data-busy id="exportSealed">Export + buyer seal</button><button id="forget">Delete local journal</button>
+      <button data-busy id="exportPlain">Export archive</button><button data-busy id="exportSealed">Export + buyer seal</button><button data-busy id="publish">Publish to logs</button><button id="forget">Delete local journal</button>
     </div>
     <details open><summary>Calls (${s.calls.length})</summary><table><thead><tr><th>key</th><th>input</th><th>state</th><th>amount</th><th>nonce</th><th>tx</th><th>evidence</th></tr></thead><tbody>${calls || '<tr><td colspan="7" class="muted">No calls yet.</td></tr>'}</tbody></table></details>
     <details><summary>Event chain (${s.events.length})</summary><table><thead><tr><th>#</th><th>kind</th><th>head</th><th>event</th></tr></thead><tbody>${events}</tbody></table></details>
     <details><summary>Terms</summary><pre>${esc(JSON.stringify(s.terms, null, 2))}</pre></details>`;
   $('#end') && ($('#end').onclick = endSession); $('#resume') && ($('#resume').onclick = resumeSession);
   $('#exportPlain').onclick = () => exportArchive(false); $('#exportSealed').onclick = () => exportArchive(true); $('#forget').onclick = forgetSession;
+  $('#publish').onclick = async () => { try { const report = await journal.export(selected); const r = await api.logs.put({ kind: 'session', title: `${s.provider.label} · ${report.summary.state}`, origin: location.host, summary: { ...report.summary, provider: s.provider.id, payer: s.terms.payer, headHash: report.headHash }, payload: { archive: report } }); log(`Published to run logs: ${r.id}`, 'ok'); } catch (e) { log(`Publish failed: ${e.message}`, 'bad'); } };
   out.querySelectorAll('[data-rec]').forEach(b => b.onclick = () => reconcile(b.dataset.rec, false));
   out.querySelectorAll('[data-rec-ev]').forEach(b => b.onclick = () => reconcile(b.dataset.recEv, true));
   if (busy) setBusy(true);

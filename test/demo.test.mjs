@@ -247,7 +247,7 @@ test('discovery builds an unsigned profile from a live 402 and refuses unsafe ta
 import { naiveRun } from '../public/sim.js';
 test('a plain x402 retry loop pays twice for a lost response and has no cap; the session does neither', async () => {
   const symbols = ['BTC-USDT', 'ETH-USDT', 'SOL-USDT', 'DOGE-USDT', 'AVAX-USDT'];
-  const naive = await naiveRun({ symbols, price: '1000', loseResponseOnCall: 2 });
+  const naive = await naiveRun({ inputs: symbols.map(symbol => ({ symbol })), price: '1000', loseResponseOnCall: 2 });
   assert.equal(naive.payments, 6); assert.equal(naive.doublePaid, 1); assert.equal(naive.spent, '6000'); assert.ok(naive.rows.every(r => r.got));
   const h = await harness({ price: '1000' });
   // Same product under a 5-call, 0.005 USDC session with the same lost response on the 2nd call.
@@ -268,4 +268,54 @@ test('a plain x402 retry loop pays twice for a lost response and has no cap; the
   await assert.rejects(h.client.call(sessionId, 'quote-extra', { symbol: 'XRP-USDT' }), /policy|budget/i);
   assert.equal(h.mock.state.paid, 5, 'the cap refused a 6th payment before any signature');
   void originalSend;
+});
+
+// ---------- missions: one cap across several provider sessions ----------
+import { verifyMissionChain } from '../public/alsp-browser.js';
+test('a mission caps spend across provider sessions before signing and exports a verifiable combined archive', async () => {
+  const a = createMockProvider({ origin: 'https://price.example', price: '1000' }), b = createMockProvider({ origin: 'https://news.example', price: '2000' });
+  const signer = evmSigner(BUYER_KEY), wallet = { address: signer.address, prepare: signer.prepare, signMessage: signer.signManifest };
+  const journal = new BrowserJournal(memoryStorage(), sharedLocks());
+  const missionId = await journal.createMission({ label: 'brief', maxTotal: '4000', payer: signer.address, network: a.profile.network });
+  const mk = async (mock, maxTotal, maxCalls) => {
+    const deps = { fetchImpl: mock.fetchImpl };
+    const api2 = { post: async (path, body) => { const [status, data] = await handle('POST', path, JSON.stringify(body), deps); if (status !== 200) throw new Error(data.error); return data; } };
+    api2.probe = (p, t, i) => api2.post('/api/x402/probe', { provider: p, terms: t, input: i }); api2.send = (p, t, i, prepared, nonce) => api2.post('/api/x402/send', { provider: p, terms: t, input: i, prepared, nonce }); api2.verify = (p, t, call, pins, rpcUrl) => api2.post('/api/x402/verify', { provider: p, terms: t, call, pins, rpcUrl });
+    const terms = { profile: PROFILE, payer: signer.address, provider: mock.profile.payTo, network: mock.profile.network, asset: mock.profile.asset.address, endpoint: `${mock.profile.origin}${mock.profile.endpointPath}`, maxTotal, maxPerCall: '2000', maxCalls, expiresAt: Date.now() + 600000, license: { uri: 'urn:test', sha256: await sha256Text('t'), acceptance: 'buyer-only' } };
+    const sessionId = await journal.create(terms, JSON.parse(JSON.stringify(mock.profile)), Date.now(), { missionId });
+    return { sessionId, client: new BrowserSessionClient(journal, { api: api2, wallet, pins: [{ address: mock.signer }], rpcUrl: `${mock.profile.origin}/rpc` }) };
+  };
+  await assert.rejects(journal.create({ profile: PROFILE, payer: signer.address, provider: a.profile.payTo, network: a.profile.network, asset: a.profile.asset.address, endpoint: `${a.profile.origin}/api/v1/quote`, maxTotal: '9000', maxPerCall: '1000', maxCalls: 9, expiresAt: Date.now() + 600000, license: { uri: 'u', sha256: await sha256Text('x'), acceptance: 'buyer-only' } }, JSON.parse(JSON.stringify(a.profile)), Date.now(), { missionId }), /exceeds the mission cap/);
+  const price = await mk(a, '4000', 4), news = await mk(b, '4000', 2);
+  assert.equal((await price.client.call(price.sessionId, 'p1', { symbol: 'BTC' })).state, 'VERIFIED');
+  assert.equal((await news.client.call(news.sessionId, 'n1', {})).state, 'VERIFIED');
+  assert.equal((await price.client.call(price.sessionId, 'p2', { symbol: 'ETH' })).state, 'VERIFIED');
+  // 1000 + 2000 + 1000 = 4000 allocated: the news session alone would still allow 2000, the mission does not.
+  await assert.rejects(news.client.call(news.sessionId, 'n2', {}), /Mission budget exceeded/);
+  assert.equal(b.state.paid, 1, 'refused before any signature');
+  await journal.endMission(missionId);
+  const archive = await journal.exportMission(missionId);
+  assert.equal(archive.summary.state, 'CLOSED'); assert.equal(archive.summary.allocatedTotal, '4000'); assert.equal(archive.sessions.length, 2); assert.deepEqual(archive.summary.providers, ['demo-oracle', 'demo-oracle']);
+  assert.ok(await verifyMissionChain(archive));
+  assert.ok(archive.sessions.every(s => verifyChain(s)));
+  const tampered = structuredClone(archive); tampered.sessions[0].events[0].event.amount = '1'; assert.equal(await verifyMissionChain(tampered), false);
+  const tampered2 = structuredClone(archive); tampered2.events[1].event.maxTotal = '1'; assert.equal(await verifyMissionChain(tampered2), false);
+});
+// ---------- central run log (file backend) ----------
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+test('run logs round-trip through the file backend and refuse bad entries', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'alsp-logs-')); process.env.ALSP_LOG_DIR = dir;
+  try {
+    const [status, put] = await handle('POST', '/api/logs', JSON.stringify({ kind: 'measurement', title: 'Sandbox 2 × 3', summary: { calls: 6 }, payload: { rows: [] } }));
+    assert.equal(status, 200); assert.match(put.id, /^\d{13}-measurement-sandbox-2-3-[0-9a-f]{8}$/);
+    const [, listing] = await handle('GET', '/api/logs', '', { query: 'limit=10' });
+    assert.equal(listing.enabled, true); assert.equal(listing.backend, 'file'); assert.equal(listing.entries[0].id, put.id); assert.equal(listing.entries[0].kind, 'measurement');
+    const [, entry] = await handle('GET', `/api/logs/${put.id}`, '');
+    assert.equal(entry.summary.calls, 6); assert.equal(entry.title, 'Sandbox 2 × 3');
+    assert.equal((await handle('POST', '/api/logs', JSON.stringify({ kind: 'nope', title: 'x' })))[0], 400);
+    assert.equal((await handle('GET', '/api/logs/../etc/passwd', ''))[0], 400);
+    const [, meta] = await handle('GET', '/api/meta', ''); assert.equal(meta.logs.enabled, true); assert.ok(meta.products.length >= 2);
+  } finally { delete process.env.ALSP_LOG_DIR; rmSync(dir, { recursive: true, force: true }); }
 });
