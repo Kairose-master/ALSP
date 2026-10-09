@@ -1,4 +1,4 @@
-import { canonical, DOCTOR_PROVIDER, object, pack, unpack, type Prepared, type ProviderProfile, type WireResponse } from './protocol.js';
+import { canonical, DOCTOR_PROVIDER, object, pack, unpack, type Prepared, type ProviderProfile, type SignedPriceAgreement, type WireResponse } from './protocol.js';
 
 export const INTEROP_USER_AGENT = 'alsp-interop/001';
 
@@ -34,10 +34,11 @@ export async function boundedFetch(url: string, init: RequestInit = {}, fetchImp
   finally { clearTimeout(timeout!); controller.abort(); }
 }
 /** x402 v2 `exact` transport for one provider profile: unpaid 402 probe and a single paid submission. */
-export function x402Transport(p: ProviderProfile, fetchImpl: typeof fetch = fetch) {
+export function x402Transport(p: ProviderProfile, fetchImpl: typeof fetch = fetch, agreement?: SignedPriceAgreement) {
+  const agreementHeaders: Record<string, string> = agreement ? { 'alsp-price-agreement': pack(agreement) } : {};
   return {
     async probe(url: string): Promise<unknown> {
-      const r = await boundedFetch(url, { method: p.method }, fetchImpl, p);
+      const r = await boundedFetch(url, { method: p.method, headers: agreementHeaders }, fetchImpl, p);
       if (r.status !== 402) throw new Error(`Expected HTTP 402, got ${r.status}`);
       const challenge = unpack(r.headers.get('payment-required'));
       // A non-empty JSON body is a mirror, not an alternative authority.
@@ -48,7 +49,7 @@ export function x402Transport(p: ProviderProfile, fetchImpl: typeof fetch = fetc
     },
     async send(url: string, payment: Prepared): Promise<WireResponse> {
       const payload = { x402Version: 2, resource: payment.quote.resource, accepted: payment.quote.accepted, payload: { signature: payment.signature, authorization: payment.authorization } };
-      const r = await boundedFetch(url, { method: p.method, headers: { 'payment-signature': pack(payload), accept: 'application/json' } }, fetchImpl, p);
+      const r = await boundedFetch(url, { method: p.method, headers: { ...agreementHeaders, 'payment-signature': pack(payload), accept: 'application/json' } }, fetchImpl, p);
       const header = r.headers.get('payment-response');
       return { status: r.status, body: r.body, settlement: header ? unpack(header) : null };
     },

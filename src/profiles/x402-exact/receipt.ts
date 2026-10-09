@@ -1,5 +1,5 @@
 import { recoverMessageAddress } from 'viem';
-import { address, atomic, canonical, digest, DOCTOR_PROVIDER, hash32, inputOf, object, text, type ProviderProfile, type ReceiptEvidence, type Terms } from './protocol.js';
+import { address, atomic, matchesAgreementLink, validateAgreementTime, canonical, digest, DOCTOR_PROVIDER, hash32, inputOf, object, text, type ProviderProfile, type ReceiptEvidence, type Terms } from './protocol.js';
 import type { Call } from './journal.js';
 
 export interface SignerPin { address: string; validFrom?: string; validUntil?: string; }
@@ -14,6 +14,7 @@ function timestamp(value: unknown): number {
  */
 export async function verifyReceipt(call: Call, terms: Terms, pins: SignerPin[], p: ProviderProfile = DOCTOR_PROVIDER, now = Date.now()): Promise<ReceiptEvidence> {
   if (!call.wire || !call.prepared || call.wire.status !== 200) throw new Error('No successful JSON response');
+  if (terms.priceAgreement && p.receipt.mode === 'unsigned') throw new Error('Agreement requires signed receipt');
   if (p.receipt.mode === 'unsigned') {
     // No provider signature exists: record the response digest; settlement is the only independent evidence.
     canonical(call.wire.body);
@@ -24,6 +25,12 @@ export async function verifyReceipt(call: Call, terms: Terms, pins: SignerPin[],
   if (r.algorithm !== 'eip191-canonical-json-v1' || r.route !== p.receipt.route || r.input_sha256 !== digest({ route: p.receipt.route, input: inputOf(call.input, p) })) throw new Error('Wrong algorithm or request binding');
   const signedAt = timestamp(r.signed_at);
   if (signedAt < call.createdAt - 60000 || signedAt > now + 30000) throw new Error('Receipt outside request time window');
+  if (terms.priceAgreement) {
+    validateAgreementTime(terms.priceAgreement, call.createdAt);
+    validateAgreementTime(terms.priceAgreement, signedAt);
+    if (!matchesAgreementLink(r.agreement, terms.priceAgreement)) throw new Error('Receipt agreement link mismatch');
+    if (atomic(call.amount) !== atomic(terms.priceAgreement.terms.unitPrice)) throw new Error('Receipt violates agreement price');
+  }
   const signature = text(r.signature);
   if (!/^0x[0-9a-fA-F]{130}$/.test(signature)) throw new Error('Invalid server signature');
   const unsigned = { ...r }; delete unsigned.signature;

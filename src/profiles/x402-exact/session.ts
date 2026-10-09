@@ -1,3 +1,4 @@
+import { verifyPriceAgreement } from './price-agreement.js';
 import { Journal, type Call } from './journal.js';
 import { requestUrl, selectQuote, validatePrepared, type Prepared, type Quote, type RequestInput, type Terms, type Verified, type WireResponse } from './protocol.js';
 
@@ -15,12 +16,15 @@ export class SessionClient {
     if (existing) return existing;
     const terms = this.journal.session(sessionId).terms;
     const p = this.journal.provider;
+    if (terms.priceAgreement) await verifyPriceAgreement(terms.priceAgreement, this.now());
     const url = requestUrl(terms, input, p), quote = selectQuote(await this.adapters.probe(url), terms, input, p);
+    // Recheck after a slow probe, before reserving or asking for a payment signature.
+    if (terms.priceAgreement) await verifyPriceAgreement(terms.priceAgreement, this.now());
     const reserved = this.journal.reserve(sessionId, key, input, quote, this.now());
     if (!reserved.created) return reserved.call;
     const c = reserved.call;
     try {
-      const prepared = await this.adapters.prepare(quote, terms, c.nonce, this.now());
+      const prepared = await this.adapters.prepare(structuredClone(quote), structuredClone(terms), c.nonce, this.now());
       validatePrepared(prepared, quote, terms, c.nonce, this.now());
       this.journal.prepared(c.id, prepared);
       this.journal.submitted(c.id, this.now()); // durable commit BEFORE network side effect

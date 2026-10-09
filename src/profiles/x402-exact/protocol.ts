@@ -181,7 +181,9 @@ export interface Terms {
   maxPerCall: string;
   maxCalls: number;
   expiresAt: number;
-  license: { uri: string; sha256: string; acceptance: 'buyer-only' };
+  license: { uri: string; sha256: string; acceptance: 'buyer-only' | 'bilateral' };
+  /** Experimental opt-in. Absent for the unchanged Doctor/browser profile. */
+  priceAgreement?: SignedPriceAgreement;
 }
 export function validateTerms(t: Terms, p: ProviderProfile = DOCTOR_PROVIDER): void {
   if (t.profile !== PROFILE || t.network !== p.network || address(t.asset) !== address(p.asset.address) || address(t.provider) !== address(p.payTo)) throw new Error('Unsupported payment profile');
@@ -190,8 +192,10 @@ export function validateTerms(t: Terms, p: ProviderProfile = DOCTOR_PROVIDER): v
   if (atomic(t.maxTotal) <= 0n || atomic(t.maxPerCall) <= 0n || atomic(t.maxPerCall) > atomic(t.maxTotal)) throw new Error('Invalid budget');
   if (!Number.isSafeInteger(t.maxCalls) || t.maxCalls < 1 || t.maxCalls > 100) throw new Error('Invalid call limit');
   if (!Number.isSafeInteger(t.expiresAt)) throw new Error('Invalid expiry');
-  if (!t.license || t.license.acceptance !== 'buyer-only' || !/^[a-f0-9]{64}$/.test(t.license.sha256)) throw new Error('Explicit license commitment required');
+  if (!t.license || !['buyer-only', 'bilateral'].includes(t.license.acceptance) || !/^[a-f0-9]{64}$/.test(t.license.sha256)) throw new Error('Explicit license commitment required');
   text(t.license.uri);
+  if (t.priceAgreement) validateAgreementBinding(t, p);
+  else if (t.license.acceptance !== 'buyer-only') throw new Error('Bilateral acceptance requires a signed price agreement');
   canonical(t);
 }
 export type RequestInput = Record<string, unknown>;
@@ -223,6 +227,7 @@ export function selectQuote(challenge: unknown, terms: Terms, input: RequestInpu
       if (!Number.isSafeInteger(a.maxTimeoutSeconds) || Number(a.maxTimeoutSeconds) < 1 || Number(a.maxTimeoutSeconds) > 3600) continue;
       const amount = atomic(a.amount);
       if (amount === 0n || amount > atomic(terms.maxPerCall)) continue;
+      if (terms.priceAgreement && (amount !== atomic(terms.priceAgreement.terms.unitPrice) || !matchesAgreementLink(extra.alspAgreement, terms.priceAgreement))) continue;
       options.push({ scheme: 'exact', network: terms.network, asset: text(a.asset), payTo: text(a.payTo), amount: amount.toString(), maxTimeoutSeconds: Number(a.maxTimeoutSeconds), extra });
     } catch { /* Malformed / unsupported options cannot authorize payment. */ }
   }
@@ -237,6 +242,8 @@ export interface Prepared {
   signature: string;
 }
 export function validatePrepared(p: Prepared, q: Quote, terms: Terms, nonce: string, now: number): void {
+  validateAgreementQuote(q, terms);
+  if (terms.priceAgreement) validateAgreementTime(terms.priceAgreement, now);
   const a = p.authorization;
   if (digest(p.quote) !== digest(q) || address(a.from) !== address(terms.payer) || address(a.to) !== address(terms.provider) || atomic(a.value) !== atomic(q.accepted.amount) || hash32(a.nonce) !== nonce) throw new Error('Signer changed payment parameters');
   const after = atomic(a.validAfter), before = atomic(a.validBefore), seconds = BigInt(Math.floor(now / 1000));
@@ -245,5 +252,66 @@ export function validatePrepared(p: Prepared, q: Quote, terms: Terms, nonce: str
 }
 export interface WireResponse { status: number; body: unknown; settlement: unknown; }
 export interface ReceiptEvidence { requestId: string; signer: string; responseHash: string; signedAt: string; }
-export interface LedgerEvidence { transaction: string; blockHash: string; blockNumber: string; confirmations: number; verification: 'rpc-confirmed'; }
+export interface LedgerEvidence { transaction: string; blockHash: string; blockNumber: string; confirmations: number; verification: 'rpc-confirmed' | 'mock-settled'; }
 export interface Verified { receipt: ReceiptEvidence; ledger: LedgerEvidence; semanticCorrectness: 'not-verified'; }
+
+/** Local experimental envelope; not the upstream x402 offer-receipt wire format. */
+export const PRICE_AGREEMENT_PROFILE = 'alsp-fixed-price-agreement-v0.1';
+export interface PriceAgreementTerms {
+  profile: typeof PRICE_AGREEMENT_PROFILE;
+  agreementId: string;
+  buyer: string;
+  provider: string;
+  network: string;
+  asset: string;
+  endpoint: string;
+  method: 'GET' | 'POST';
+  termsVersion: string;
+  termsSha256: string;
+  unitPrice: string;
+  maxCalls: number;
+  maxTotal: string;
+  validFrom: number;
+  expiresAt: number;
+}
+export interface SignedPriceAgreement {
+  terms: PriceAgreementTerms;
+  providerSignature: `0x${string}`;
+  buyerSignature: `0x${string}`;
+}
+export interface AgreementLink { agreementId: string; agreementHash: string; }
+export function agreementLink(a: Pick<SignedPriceAgreement, 'terms'>): AgreementLink {
+  return { agreementId: a.terms.agreementId, agreementHash: digest(a.terms) };
+}
+export function matchesAgreementLink(value: unknown, a: SignedPriceAgreement): boolean {
+  try { return canonical(value) === canonical(agreementLink(a)); } catch { return false; }
+}
+export function validatePriceAgreementTerms(a: PriceAgreementTerms): void {
+  if (a.profile !== PRICE_AGREEMENT_PROFILE || !/^[A-Za-z0-9._-]{1,100}$/.test(text(a.agreementId))) throw new Error('Invalid price agreement identity');
+  address(a.buyer); address(a.provider); address(a.asset); chainIdOf(a.network);
+  const endpoint = new URL(text(a.endpoint));
+  if (endpoint.username || endpoint.password || endpoint.search || endpoint.hash || (endpoint.protocol !== 'https:' && !(endpoint.protocol === 'http:' && LOOPBACK.test(endpoint.hostname)))) throw new Error('Invalid agreement endpoint');
+  if (a.method !== 'GET' && a.method !== 'POST') throw new Error('Invalid agreement method');
+  text(a.termsVersion);
+  if (!/^[a-f0-9]{64}$/.test(a.termsSha256)) throw new Error('Invalid agreement terms hash');
+  if (atomic(a.unitPrice) <= 0n || atomic(a.maxTotal) < atomic(a.unitPrice)) throw new Error('Invalid agreement price or allowance');
+  if (!Number.isSafeInteger(a.maxCalls) || a.maxCalls < 1 || a.maxCalls > 100) throw new Error('Invalid agreement call allowance');
+  if (!Number.isSafeInteger(a.validFrom) || !Number.isSafeInteger(a.expiresAt) || a.validFrom < 0 || a.expiresAt <= a.validFrom) throw new Error('Invalid agreement validity window');
+  canonical(a);
+}
+export function validateAgreementTime(a: SignedPriceAgreement, now: number): void {
+  if (!Number.isSafeInteger(now) || now < a.terms.validFrom || now >= a.terms.expiresAt) throw new Error('Price agreement not active');
+}
+/** Structural/policy checks only. Call verifyPriceAgreement before signing or serving. */
+export function validateAgreementBinding(t: Terms, p: ProviderProfile): void {
+  const a = t.priceAgreement;
+  if (!a) throw new Error('Missing price agreement');
+  validatePriceAgreementTerms(a.terms);
+  if (t.license.acceptance !== 'bilateral' || a.terms.termsSha256 !== t.license.sha256) throw new Error('Agreement terms commitment mismatch');
+  if (address(a.terms.buyer) !== address(t.payer) || address(a.terms.provider) !== address(t.provider) || address(a.terms.provider) !== address(p.payTo) || a.terms.network !== t.network || address(a.terms.asset) !== address(t.asset) || a.terms.endpoint !== t.endpoint || a.terms.endpoint !== endpointUrl(p) || a.terms.method !== p.method) throw new Error('Agreement buyer or provider binding mismatch');
+  if (t.expiresAt > a.terms.expiresAt || atomic(t.maxPerCall) < atomic(a.terms.unitPrice) || atomic(t.maxTotal) < atomic(a.terms.unitPrice)) throw new Error('Session policy cannot honor price agreement');
+  if (p.receipt.mode === 'unsigned') throw new Error('Price agreement requires signed provider receipts');
+}
+export function validateAgreementQuote(q: Quote, t: Terms): void {
+  if (t.priceAgreement && (atomic(q.accepted.amount) !== atomic(t.priceAgreement.terms.unitPrice) || !matchesAgreementLink(q.accepted.extra.alspAgreement, t.priceAgreement))) throw new Error('Quote violates price agreement');
+}
