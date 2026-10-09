@@ -21,6 +21,10 @@ Receipt signatures establish server provenance/request binding, not semantic ser
 
 The steps below are a runbook for separately authorized future trials, not evidence that every current client has completed a paid run.
 
+## Separate offline agreement demo
+
+The [signed fixed-price example](../examples/price-agreement/README.md) additionally tests explicit provider and buyer assent with public fixture keys and mock settlement. Its provider signs the agreement and linked receipts; the archive verifier checks that evidence. This is separate from the dated Doctor validation record above: it adds no external-provider assent, real payment or provider-side correlation of PR #7.
+
 ## 1. No-money check
 
 ```bash

@@ -2,7 +2,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { chmodSync, closeSync, constants, existsSync, lstatSync, mkdirSync, openSync } from 'node:fs';
 import { dirname } from 'node:path';
-import { atomic, canonical, digest, DOCTOR_PROVIDER, inputOf, PROFILE, validateTerms, type Prepared, type ProviderProfile, type Quote, type RequestInput, type Terms, type Verified, type WireResponse } from './protocol.js';
+import { agreementLink, atomic, canonical, digest, validateAgreementTime, validateAgreementQuote, selectQuote, DOCTOR_PROVIDER, inputOf, PROFILE, validateTerms, type Prepared, type ProviderProfile, type Quote, type RequestInput, type SignedPriceAgreement, type Terms, type Verified, type WireResponse } from './protocol.js';
 
 export interface Call {
   id: string; sessionId: string; requestKey: string; requestHash: string;
@@ -43,6 +43,7 @@ export class Journal {
   }
   create(terms: Terms, now = Date.now()): string {
     validateTerms(terms, this.provider);
+    if (terms.priceAgreement) validateAgreementTime(terms.priceAgreement, now);
     if (terms.expiresAt <= now) throw new Error('Session already expired');
     const id = randomUUID();
     this.db.prepare('INSERT INTO sessions VALUES(?,?,?,?,?)').run(id, canonical(terms), 'ACTIVE', digest({ profile: PROFILE, sessionId: id, terms }), 0);
@@ -78,6 +79,15 @@ export class Journal {
     return c;
   }
   private put(c: Call): void { this.db.prepare('UPDATE calls SET value=? WHERE id=?').run(canonical(c), c.id); }
+  private agreementCalls(agreement: SignedPriceAgreement): Call[] {
+    const sessions = this.db.prepare('SELECT id,terms FROM sessions').all();
+    return sessions.filter(row => {
+      const other = (JSON.parse(String(row.terms)) as Terms).priceAgreement;
+      if (!other || other.terms.agreementId !== agreement.terms.agreementId || other.terms.provider.toLowerCase() !== agreement.terms.provider.toLowerCase()) return false;
+      if (digest(other.terms) !== digest(agreement.terms)) throw new Error('Conflicting agreement identity');
+      return true;
+    }).flatMap(row => this.calls(String(row.id)));
+  }
   reserve(sessionId: string, key: string, input: RequestInput, quote: Quote, now = Date.now()): { call: Call; created: boolean } {
     return this.transaction(() => {
       const old = this.find(sessionId, key, input);
@@ -85,12 +95,22 @@ export class Journal {
       const s = this.session(sessionId), calls = this.calls(sessionId), amount = atomic(quote.accepted.amount);
       if (s.state !== 'ACTIVE' || now >= s.terms.expiresAt) throw new Error('Session not active');
       if (amount <= 0n || amount > atomic(s.terms.maxPerCall) || calls.length >= s.terms.maxCalls) throw new Error('Per-call policy exceeded');
+      if (s.terms.priceAgreement) {
+        const agreement = s.terms.priceAgreement;
+        validateAgreementTime(agreement, now);
+        validateAgreementQuote(quote, s.terms);
+        const selected = selectQuote({ x402Version: quote.x402Version, resource: quote.resource, accepts: [quote.accepted] }, s.terms, input, this.provider);
+        if (digest(selected) !== digest(quote)) throw new Error('Invalid agreement quote');
+        // Shared allowance across sessions in this journal. The provider must enforce it globally.
+        const related = this.agreementCalls(agreement);
+        if (related.length >= agreement.terms.maxCalls || related.reduce((sum, call) => sum + atomic(call.amount), 0n) + amount > atomic(agreement.terms.maxTotal)) throw new Error('Price agreement allowance exceeded');
+      }
       // Include every unresolved reservation: a network error never frees funds.
       if (calls.reduce((sum, c) => sum + atomic(c.amount), 0n) + amount > atomic(s.terms.maxTotal)) throw new Error('Session budget exceeded');
       const c: Call = { id: randomUUID(), sessionId, requestKey: key, requestHash: digest({ endpoint: s.terms.endpoint, input: inputOf(input, this.provider) }), input, quote, amount: amount.toString(), nonce: `0x${randomBytes(32).toString('hex')}`, createdAt: now, state: 'RESERVED', prepared: null, wire: null, verified: null };
       this.db.prepare('INSERT INTO calls VALUES(?,?,?,?)').run(c.id, sessionId, key, canonical(c));
       this.db.prepare('INSERT INTO payments VALUES(?,?)').run(`${s.terms.network}:${s.terms.asset.toLowerCase()}:${s.terms.payer.toLowerCase()}:${c.nonce}`, c.id);
-      this.append(sessionId, { kind: 'reserved', callId: c.id, requestKey: key, requestHash: c.requestHash, amount: c.amount, nonce: c.nonce });
+      this.append(sessionId, { kind: 'reserved', callId: c.id, requestKey: key, requestHash: c.requestHash, amount: c.amount, nonce: c.nonce, ...(s.terms.priceAgreement ? { createdAt: c.createdAt, quoteHash: digest(c.quote), agreement: agreementLink(s.terms.priceAgreement) } : {}) });
       return { call: c, created: true };
     });
   }
@@ -100,13 +120,14 @@ export class Journal {
       if (c.state !== 'RESERVED') throw new Error('Already authorized');
       c.prepared = prepared; c.state = 'AUTHORIZED'; this.put(c);
       // Signed bearer authorization stays in the 0600 journal, not the public log.
-      this.append(c.sessionId, { kind: 'authorized', callId: id, paymentHash: digest(prepared) });
+      this.append(c.sessionId, { kind: 'authorized', callId: id, paymentHash: digest(prepared), ...(this.session(c.sessionId).terms.priceAgreement ? { authorizationHash: digest(prepared.authorization) } : {}) });
     });
   }
   submitted(id: string, now = Date.now()): void {
     this.transaction(() => {
       const c = this.call(id), s = this.session(c.sessionId);
       if (c.state !== 'AUTHORIZED' || !c.prepared || s.state !== 'ACTIVE' || now >= s.terms.expiresAt) throw new Error('Cannot submit');
+      if (s.terms.priceAgreement) validateAgreementTime(s.terms.priceAgreement, now);
       c.state = 'SUBMITTED'; this.put(c);
       this.append(c.sessionId, { kind: 'submission_intent', callId: id });
     });
@@ -144,6 +165,12 @@ export class Journal {
       if (s.state === 'ACTIVE') return;
       if (now >= s.terms.expiresAt) throw new Error('Session expired');
       if (calls.some(c => c.state !== 'VERIFIED')) throw new Error('Unresolved call prevents resume');
+      if (s.terms.priceAgreement) {
+        const agreement = s.terms.priceAgreement;
+        validateAgreementTime(agreement, now);
+        const related = this.agreementCalls(agreement);
+        if (related.length >= agreement.terms.maxCalls || related.reduce((sum, call) => sum + atomic(call.amount), 0n) + atomic(agreement.terms.unitPrice) > atomic(agreement.terms.maxTotal)) throw new Error('Price agreement allowance exhausted');
+      }
       if (calls.length >= s.terms.maxCalls) throw new Error('Session call limit reached');
       if (calls.reduce((sum, c) => sum + atomic(c.amount), 0n) >= atomic(s.terms.maxTotal)) throw new Error('Session budget exhausted');
       this.db.prepare('UPDATE sessions SET state=? WHERE id=?').run('ACTIVE', sessionId);
@@ -162,8 +189,8 @@ export class Journal {
     const s = this.session(sessionId), calls = this.calls(sessionId);
     const events: EventRow[] = this.db.prepare('SELECT * FROM events WHERE session_id=? ORDER BY seq').all(sessionId).map(r => ({ seq: Number(r.seq), previous: String(r.previous), head: String(r.head), event: JSON.parse(String(r.event)) as unknown }));
     return { profile: PROFILE, sessionId, terms: s.terms, termsHash: digest(s.terms), headHash: s.head, events,
-      summary: { state: s.state === 'ACTIVE' ? 'ACTIVE' : calls.every(c => c.state === 'VERIFIED') ? 'CLOSED' : 'RECONCILIATION_REQUIRED', allocatedTotal: calls.reduce((sum, c) => sum + atomic(c.amount), 0n).toString(), verifiedSpent: calls.filter(c => c.state === 'VERIFIED').reduce((sum, c) => sum + atomic(c.amount), 0n).toString(), unresolved: calls.filter(c => c.state !== 'VERIFIED').length, calls: calls.length, registryWrites: 0, settlementMode: 'exact-per-call', licenseAcceptance: 'buyer-only' },
-      evidence: calls.map(c => ({ callId: c.id, input: c.input, quote: c.quote, nonce: c.nonce, wire: c.wire, verified: c.verified })) };
+      summary: { state: s.state === 'ACTIVE' ? 'ACTIVE' : calls.every(c => c.state === 'VERIFIED') ? 'CLOSED' : 'RECONCILIATION_REQUIRED', allocatedTotal: calls.reduce((sum, c) => sum + atomic(c.amount), 0n).toString(), verifiedSpent: calls.filter(c => c.state === 'VERIFIED').reduce((sum, c) => sum + atomic(c.amount), 0n).toString(), unresolved: calls.filter(c => c.state !== 'VERIFIED').length, calls: calls.length, registryWrites: 0, settlementMode: 'exact-per-call', licenseAcceptance: s.terms.license.acceptance, ...(s.terms.priceAgreement ? { priceAgreementAcceptance: 'bilateral' } : {}) },
+      evidence: calls.map(c => ({ callId: c.id, input: c.input, quote: c.quote, nonce: c.nonce, wire: c.wire, verified: c.verified, ...(s.terms.priceAgreement ? { createdAt: c.createdAt, authorization: c.prepared?.authorization ?? null } : {}) })) };
   }
 }
 export function verifyChain(archive: ReturnType<Journal['export']>): boolean {

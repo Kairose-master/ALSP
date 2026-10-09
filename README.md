@@ -4,7 +4,7 @@
 
 ```text
 ALSP Core
-├── x402 Exact Profile   runnable buyer-side compatibility reference
+├── x402 Exact Profile   buyer-side reference + opt-in signed-price demo
 └── License Profile      legacy check-in/check-out research design
 ```
 
@@ -16,7 +16,8 @@ Core does not prescribe a payment rail or require an on-chain registry. The x402
 - **Free probe:** `doctor:probe` checks the live public 402 challenge and signer metadata without paying. It is a compatibility probe only.
 - **Buyer-side paid Base/USDC run:** [PR #7](https://github.com/Kairose-master/ALSP/pull/7) records three ordinary x402 `exact` payments grouped into one bounded ALSP session, independent settlement verification for all three, reconciliation of uncertain outcomes without replacement payments, and closure with zero unresolved calls. No additional registry transactions were required. This is buyer-side live-payment evidence; provider-side cross-check remains pending.
 - **Browser client:** [PR #9](https://github.com/Kairose-master/ALSP/pull/9) adds the wallet-signed client and stateless proxy. `test/demo.test.mjs` exercises the browser journal, replay, reconciliation and archive verification in Node with a mock provider/ledger. [PR #10](https://github.com/Kairose-master/ALSP/pull/10) adds corrupt/inaccessible-storage and competing-reservation regressions with an injected shared lock manager. These are not a browser mainnet paid run or an actual multi-tab browser test.
-- **Unverified:** provider-side correlation/assent, fully verified bilateral interoperability, and x402 standards adoption. ALSP remains an experimental proposal/profile. See the [validation record](docs/INTEROP-001.md#validation-record-as-of-2026-10-08) for evidence boundaries.
+- **Offline bilateral price agreement:** `npm run demo:price-agreement` uses real provider/buyer signatures and three independently mock-settled exact calls at one agreed price despite public-price changes. The provider enforces agreement identity, price and allowance. See the [runnable example and boundaries](examples/price-agreement/README.md).
+- **Unverified externally:** provider-side correlation/assent for the recorded live run, fully verified bilateral interoperability, and x402 standards adoption. ALSP remains an experimental proposal/profile. See the [validation record](docs/INTEROP-001.md#validation-record-as-of-2026-10-08) for evidence boundaries.
 - `contracts/license/experimental/ALSPRegistry.sol` is an unaudited legacy sketch. The x402 Exact profile does not invoke it, and Core does not require it.
 
 ## Doctor x402 Exact reference
@@ -38,7 +39,7 @@ The runner persists reservation, nonce, signed authorization, submission intent,
 
 - Doctor signature: server provenance and request/payment binding, not semantic truth.
 - RPC-confirmed USDC events: settlement evidence from the configured RPC, not a trustless light-client proof or absolute finality.
-- Buyer-sealed archive: integrity of the buyer's local record, not provider assent, log completeness, or billing fairness.
+- Buyer-sealed archive alone: integrity of the buyer's local record, not provider assent, log completeness, or billing fairness. The optional offline price-agreement verifier additionally checks explicit provider/buyer agreement signatures and linked signed receipts.
 - No registry write or final-head anchoring is implemented in this profile.
 
 ## Web client (wallet-signed, any x402 exact provider)
@@ -71,6 +72,7 @@ Deploy to Vercel as-is (`vercel.json`, `api/index.js`). Optional env: `ALSP_RPC_
 - `src/profiles/license/` — reserved for a future executable License Profile; current legacy fixtures remain in `examples/knowledge-api/`.
 - `spec/` — Core and profile specifications.
 - `contracts/license/experimental/` — legacy Solidity research sketch, outside Core requirements.
+- `examples/price-agreement/` — offline bilateral fixed-price demo, real signatures and explicitly mocked settlement.
 - `examples/doctor/` — x402 Exact client example (CLI).
 - `public/`, `demo/`, `api/` — wallet-signed web client, local server and Vercel function.
 - `examples/knowledge-api/` — legacy check-in/check-out fixtures.

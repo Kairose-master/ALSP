@@ -1,6 +1,6 @@
 # ALSP x402 Exact Profile — reference v0.2
 
-**Status: experimental buyer-side compatibility implementation.** The `main` baseline has local tests and a free live challenge probe. Tests use mock ledger evidence; no paid mainnet interoperability run is claimed here. See the repository README for the current validation boundary.
+**Status: experimental buyer-side compatibility implementation, with an opt-in offline bilateral price-agreement demo.** Local tests use mock ledger evidence. The separate buyer-side paid run recorded in PR #7 is documented in [Interop #001](../docs/INTEROP-001.md); it does not establish provider assent to ALSP terms. See the repository README for the current validation boundary.
 
 ## Scope
 
@@ -10,11 +10,17 @@ The first milestone is deliberately narrower than authorize-max → settle-actua
 
 ## Agreement / trust model
 
-Terms are immutable JSON with a digest of locally reviewed license bytes, payer, provider, endpoint, network/asset, call count, expiry and two atomic budgets. Acceptance is **buyer-only**. The unchanged Doctor service signs the request and payment metadata, NOT these ALSP terms. A hash is neither legal enforceability nor mutual agreement.
+Terms are immutable JSON with a digest of locally reviewed license bytes, payer, provider, endpoint, network/asset, call count, expiry and two atomic budgets. In the unchanged Doctor flow, acceptance is **buyer-only**. The unchanged Doctor service signs the request and payment metadata, NOT these ALSP terms. A hash is neither legal enforceability nor mutual agreement.
 
 The client pins Doctor's payout and Base USDC addresses. Receipt verification requires an independently configured signing-key pin, or a signing-key certificate verified against the payout authority. Pin validity bounds and certificate start dates are checked. The paid CLI requires an explicit signer pin; the free metadata probe does not silently establish trust.
 
 A provider response claiming `no_go` about an intentionally broken target can be a correctly delivered preflight service. Validation of its JSON/signature is not validation of its factual verdict; all verified records retain `semanticCorrectness: not-verified`.
+
+## Optional signed fixed-price agreement
+
+`Terms.priceAgreement` carries a provider-offer signature and buyer-acceptance signature over the same `alsp-fixed-price-agreement-v0.1` terms. These bind the buyer/provider EOAs, agreement ID, endpoint/method, network/asset, terms version/hash, unit price, total/call allowance and validity interval. Buyer acceptance also hashes the signed offer. The Node client validates both signatures before payment signing, requires the exact agreed quote price/link, and reserves against both session caps and the shared agreement allowance in its journal.
+
+The offline provider verifies and registers both signatures, enforces its agreement-wide allowance, and includes the agreement ID/hash in each signed receipt. The archive verifier checks external identity pins, signatures and per-call/event links. This is a local experimental envelope, not upstream `offer-receipt` wire compatibility. The example uses mock settlement exclusively. It adds no support to the current browser UI or unchanged Doctor service. See [the runnable demo](../examples/price-agreement/README.md) for scope, fields and limitations.
 
 ## States and failure semantics
 

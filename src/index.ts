@@ -7,3 +7,5 @@ export * from './profiles/x402-exact/http.js';
 export * from './profiles/x402-exact/receipt.js';
 export * from './profiles/x402-exact/evm.js';
 export * from './profiles/x402-exact/archive.js';
+export * from './profiles/x402-exact/price-agreement.js';
+export * from './profiles/x402-exact/agreement-archive.js';
