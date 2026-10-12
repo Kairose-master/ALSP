@@ -1,5 +1,5 @@
 // Central run log: every agent run, measurement and exported archive from the deployment in one place.
-// Storage is Vercel Blob when BLOB_READ_WRITE_TOKEN is set (connect a Blob store to the project), else a
+// Storage is Vercel Blob when BLOB_READ_WRITE_TOKEN or BLOB_STORE_ID is set (connect a Blob store to the project), else a
 // local directory for `npm run demo`. Entries are JSON; the listing is derived from blob pathnames so it
 // needs no index file. Nothing here is secret: exports never contain bearer signatures.
 import { mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises';
@@ -11,10 +11,26 @@ const PREFIX = 'alsp-logs/';
 const MAX_BYTES = 1024 * 1024;
 const slug = s => String(s ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 48) || 'untitled';
 
+// Blob credentials come from either a read-write token or, for stores connected through the Vercel
+// dashboard, BLOB_STORE_ID plus the OIDC token Vercel injects into functions (the SDK handles that).
+const hasBlob = () => Boolean(process.env.BLOB_READ_WRITE_TOKEN || process.env.BLOB_STORE_ID);
 function backend() {
-  if (process.env.BLOB_READ_WRITE_TOKEN) return 'blob';
+  if (hasBlob()) return 'blob';
   if (!process.env.VERCEL) return 'file';
   return null;
+}
+// A store is either public or private and the SDK rejects the wrong one, so learn it once per instance.
+let blobAccess = process.env.ALSP_LOG_ACCESS === 'private' ? 'private' : 'public';
+const other = a => (a === 'public' ? 'private' : 'public');
+const isAccessError = err => err && (err.name === 'BlobAccessError' || /access/i.test(String(err.message)));
+async function withAccess(fn) {
+  try { return await fn(blobAccess); }
+  catch (err) {
+    if (!isAccessError(err)) throw err;
+    const result = await fn(other(blobAccess)); // throws if that is wrong too
+    blobAccess = other(blobAccess);
+    return result;
+  }
 }
 const localDir = () => process.env.ALSP_LOG_DIR || 'data/logs';
 export function logsEnabled() { return backend() !== null; }
@@ -36,15 +52,15 @@ export async function putLog(entry) {
   const b = backend();
   if (b === 'blob') {
     const { put } = await import('@vercel/blob');
-    const r = await put(`${PREFIX}${id}.json`, body, { access: 'public', contentType: 'application/json', addRandomSuffix: false });
-    return { id, url: r.url, backend: b };
+    const r = await withAccess(access => put(`${PREFIX}${id}.json`, body, { access, contentType: 'application/json', addRandomSuffix: false }));
+    return { id, url: blobAccess === 'public' ? r.url : `/api/logs/${id}`, backend: b, access: blobAccess };
   }
   if (b === 'file') {
     await mkdir(localDir(), { recursive: true });
     await writeFile(join(localDir(), `${id}.json`), body);
     return { id, url: `/api/logs/${id}`, backend: b };
   }
-  throw new Error('Logs are not configured on this deployment (connect a Vercel Blob store or set BLOB_READ_WRITE_TOKEN)');
+  throw new Error('Logs are not configured on this deployment (connect a Vercel Blob store: BLOB_STORE_ID or BLOB_READ_WRITE_TOKEN)');
 }
 
 export async function listLogs(limit = 100) {
@@ -54,7 +70,7 @@ export async function listLogs(limit = 100) {
     let cursor;
     do {
       const page = await list({ prefix: PREFIX, limit: 1000, cursor });
-      for (const blob of page.blobs) { const meta = parsePath(blob.pathname); if (meta) out.push({ ...meta, size: blob.size, url: blob.url }); }
+      for (const blob of page.blobs) { const meta = parsePath(blob.pathname); if (meta) out.push({ ...meta, size: blob.size, url: `/api/logs/${meta.id}` }); }
       cursor = page.hasMore ? page.cursor : undefined;
     } while (cursor && out.length < 5000);
   } else if (b === 'file') {
@@ -70,13 +86,10 @@ export async function getLog(id) {
   if (!new RegExp(`^\\d{13}-(${KINDS.join('|')})-[a-z0-9-]+-[0-9a-f]{8}$`).test(String(id))) throw new Error('Invalid log id');
   const b = backend();
   if (b === 'blob') {
-    const { list } = await import('@vercel/blob');
-    const page = await list({ prefix: `${PREFIX}${id}.json`, limit: 1 });
-    const blob = page.blobs[0];
-    if (!blob) throw new Error('Log not found');
-    const r = await fetch(blob.url, { cache: 'no-store' });
-    if (!r.ok) throw new Error('Log fetch failed');
-    return JSON.parse(await r.text());
+    const { get } = await import('@vercel/blob');
+    const result = await withAccess(access => get(`${PREFIX}${id}.json`, { access, useCache: false }));
+    if (!result || result.statusCode === 404 || !result.stream) throw new Error('Log not found');
+    return JSON.parse(await new Response(result.stream).text());
   }
   if (b === 'file') return JSON.parse(await readFile(join(localDir(), `${id}.json`), 'utf8'));
   throw new Error('Logs are not configured on this deployment');
