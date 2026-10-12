@@ -1,0 +1,91 @@
+{
+  "repository": "Kairose-master/ALSP",
+  "mainSha": "545221097a48cb6480c58b5d43e05f302acef30f",
+  "treeSha": "a671253b8c85414a1da9e1fd52a35e15a8abc66c",
+  "files": {
+    "package.json": {
+      "gitBlobSha": "5294f468b7daf426cb134675a4e22455ce1183ab",
+      "bytes": 1140
+    },
+    "src/archive.ts": {
+      "gitBlobSha": "833ebefa761891d854b809ec2697de069302ff32",
+      "bytes": 115
+    },
+    "src/core/types.ts": {
+      "gitBlobSha": "3dbd79c4cca374d6922226b8f789c02aa5caa3e7",
+      "bytes": 530
+    },
+    "src/evm.ts": {
+      "gitBlobSha": "72bca97093cb2715d29574c6ed50774d90cc9e5c",
+      "bytes": 107
+    },
+    "src/http.ts": {
+      "gitBlobSha": "7902d1792767315838a97e41088c9a71979acb2e",
+      "bytes": 109
+    },
+    "src/index.ts": {
+      "gitBlobSha": "83b71221ee7f15b30507ed32e8d3d08ea8d6c613",
+      "bytes": 579
+    },
+    "src/journal.ts": {
+      "gitBlobSha": "1b4fcee8a6795ad6ba6f3c13a13c1909e65de475",
+      "bytes": 115
+    },
+    "src/profiles/license/README.md": {
+      "gitBlobSha": "b67e33877dbe72b11c352682221e3a447a46a21e",
+      "bytes": 262
+    },
+    "src/profiles/x402-exact/agreement-archive.ts": {
+      "gitBlobSha": "ce9610af19dc674c68344a4619857a4eca4a5f69",
+      "bytes": 12858
+    },
+    "src/profiles/x402-exact/archive.ts": {
+      "gitBlobSha": "0a1c555293e2b6dc010e88cda6cf3a24591948a9",
+      "bytes": 1140
+    },
+    "src/profiles/x402-exact/evm.ts": {
+      "gitBlobSha": "d40e2c32f8af76595da85f2a9ef14ba8d768eeaf",
+      "bytes": 7220
+    },
+    "src/profiles/x402-exact/http.ts": {
+      "gitBlobSha": "bdab67fc4f163c47fb41c9585448965b10b945aa",
+      "bytes": 3964
+    },
+    "src/profiles/x402-exact/journal.ts": {
+      "gitBlobSha": "933b0631395c1f1b84693c1ea0587c11df597b5e",
+      "bytes": 14619
+    },
+    "src/profiles/x402-exact/price-agreement.ts": {
+      "gitBlobSha": "c9869497041a0774b8c027c5b391aa6d1be16d64",
+      "bytes": 1986
+    },
+    "src/profiles/x402-exact/protocol.ts": {
+      "gitBlobSha": "117b780860ee4b4bbd4a9df396a38fe39c5bee4a",
+      "bytes": 20023
+    },
+    "src/profiles/x402-exact/receipt.ts": {
+      "gitBlobSha": "7a3a6d52f52f169240139da1f3935af4c3767364",
+      "bytes": 5010
+    },
+    "src/profiles/x402-exact/session.ts": {
+      "gitBlobSha": "29304887172329c5cbe0f0b6603df9cd0e0525e3",
+      "bytes": 2911
+    },
+    "src/protocol.ts": {
+      "gitBlobSha": "4815750e35865be881fc5d72afc2afe5f6a4de4a",
+      "bytes": 117
+    },
+    "src/receipt.ts": {
+      "gitBlobSha": "44833cb393f1ab27dd272ec2e767c3cec7572bde",
+      "bytes": 115
+    },
+    "src/session.ts": {
+      "gitBlobSha": "528da61e907d9975df1c829885494646363a1dbc",
+      "bytes": 115
+    },
+    "tsconfig.json": {
+      "gitBlobSha": "07e07531b24b7a382e06b07daf369d2812fa40d9",
+      "bytes": 347
+    }
+  }
+}
