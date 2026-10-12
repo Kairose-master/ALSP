@@ -1,0 +1,283 @@
+{
+  "label": "Non-normative comparison/fixture annotations; these are not ALSP native fields or provider evidence.",
+  "publicContractMapping": {
+    "offerId": "context-compression",
+    "resource": "https://www.mahastrategies.com/api/v1/compress",
+    "metadataVersion": "2026-08-10",
+    "metadataSchemaVersion": "1.0.0",
+    "catalogVersion": "0.2.3",
+    "catalogUpdatedAt": "2026-09-09",
+    "termsVersion": null,
+    "termsVersionNote": "The metadata/catalog versions above are not a signed provider terms version.",
+    "requiresIdempotency": false,
+    "payment": {
+      "scheme": "exact",
+      "network": "eip155:8453",
+      "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+      "payTo": "0xec84c1cd6602bbe387bc8e6f0d3c062f2762de28",
+      "amount": "1000",
+      "decimals": 6,
+      "displayAmountUSDC": "0.001"
+    },
+    "inputSchemaNotes": {
+      "clientRequestId": "string, 8–120 chars",
+      "task": "string, 8–1200 chars",
+      "tokenBudget": "integer, 64–16000",
+      "documents": "1–8 items; id regex ^[A-Za-z0-9][A-Za-z0-9._:-]{0,79}$; non-empty text; optional title 1–160 chars",
+      "additionalOptions": {
+        "provenance": [
+          "full",
+          "compact",
+          "none"
+        ],
+        "scoring": [
+          "bm25",
+          "keyword"
+        ],
+        "budgetMode": [
+          "guaranteed",
+          "estimated"
+        ]
+      },
+      "unknownProperties": "rejected at root and document level",
+      "requestBodyMaxBytes": 450000,
+      "settlementValidation": "before settlement"
+    },
+    "responseSchemaNotes": {
+      "version": "0.1.0",
+      "packIdPattern": "^ctxpack_[a-f0-9]{32}$",
+      "hashes": "sha256: followed by 64 lowercase hexadecimal characters",
+      "bodyShape": "Not fabricated in this fixture; no live or authoritative response body was fetched."
+    },
+    "sourceUrls": [
+      "https://www.mahastrategies.com/api/discovery/x402-offers/context-compression",
+      "https://www.mahastrategies.com/.well-known/maha/offer-selection.json",
+      "https://www.mahastrategies.com/context-pack-schema.json",
+      "https://www.mahastrategies.com/pricing",
+      "https://www.mahastrategies.com/recipes/bazaar-discovery-to-payment"
+    ]
+  },
+  "alspNativeFieldMapping": {
+    "resource": "terms.endpoint and evidence[].quote.resource.url",
+    "offerId": "No native field; see publicContractMapping.offerId.",
+    "providerMetadataVersion": "No native field; metadataVersion is non-normative and not signed terms.",
+    "requestOrPurchaseId": "evidence[].callId is local ALSP identity; unsigned receipt requestId is unsigned:<nonce>, not a provider-issued ID. requestKey appears in the reserved event.",
+    "inputDigest": "No standalone native input digest. reserved.event.requestHash is SHA-256(canonical({endpoint,input:normalizedInput})); it is not a bare input digest or Maha inputHash.",
+    "paymentFields": "terms network/asset/provider plus evidence[].quote.accepted amount/payTo.",
+    "transaction": "wire.settlement.transaction when a WireResponse exists; otherwise only the non-native mock-ledger annotation has the mock tx hash.",
+    "authorizationNonce": "evidence[].nonce and the reserved event; the ordinary archive does not export the bearer signature.",
+    "settlementAndDelivery": "No separate native settlement_status/delivery_status. The companion annotations are synthetic fixture observations only.",
+    "providerResponseAuthenticity": "Unsigned mode records signer=none and a body digest; it does not authenticate response content."
+  },
+  "requestSerializationObservation": {
+    "method": "POST",
+    "payloadQueryPresent": true,
+    "requestBodyPresent": false,
+    "matchesMahaJsonBodyContract": false,
+    "note": "The actual ALSP x402 transport was exercised against an in-process fetch mock. Its flat string normalizer places JSON text in a query parameter and POST sends no JSON body."
+  },
+  "scenarios": {
+    "success": {
+      "independentMockLedgerState": "mock-settled",
+      "deliveryObservation": "synthetic HTTP 200 body observed; not a Maha response",
+      "paymentCount": 1,
+      "transaction": "0xcafd958eca0c63de266be14fc5c3ceb2ee39198d56fd454510700ecf497ee7a5",
+      "requestObservation": {
+        "method": "POST",
+        "path": "/api/v1/compress",
+        "payloadQueryPresent": true,
+        "requestBodyPresent": false,
+        "paymentHeaderPresent": true
+      }
+    },
+    "noWireAndUnrecoverableOutput": {
+      "independentMockLedgerState": "mock-settled",
+      "deliveryObservation": "no response received",
+      "originalOutputRecoverable": false,
+      "paymentCount": 1,
+      "transaction": "0x3523259c35547bf8cfad5d8143c8ed4eab61062f530781bdd5dcf24e3e656bfa",
+      "responseEvidenceRetainedByMock": false,
+      "retrySameRequestKeyAddedPayment": false
+    },
+    "lostThenBodylessRecovery": {
+      "independentMockLedgerState": "mock-settled",
+      "deliveryObservation": "HTTP 200 WireResponse recovered with a null body; no output payload recovered",
+      "originalOutputRecoverable": false,
+      "responseEvidenceRecovered": true,
+      "paymentCount": 1,
+      "paymentSubmissions": 1,
+      "transaction": "0xa8c9a183749cb5d555e8d9b8ab7384a2854445d721834ebfe3fa19e3dba9ba17",
+      "requestObservation": {
+        "method": "POST",
+        "path": "/api/v1/compress",
+        "payloadQueryPresent": true,
+        "requestBodyPresent": false,
+        "paymentHeaderPresent": true
+      }
+    },
+    "directHttp200NullBody": {
+      "nativeState": "CLOSED",
+      "bodyIsNull": true,
+      "receiptSigner": "none",
+      "settlementVerifierLabel": "rpc-confirmed",
+      "interpretation": "Synthetic mock RPC only; VERIFIED does not mean content was delivered or authenticated."
+    }
+  },
+  "snapshotSummaries": {
+    "success": {
+      "termsHash": "e38d207ebc603c49963e1685abf147185980076cd553ec2cb420c2beb8ba5ca3",
+      "termsProfile": "alsp-exact-session-v0.2",
+      "resource": "https://www.mahastrategies.com/api/v1/compress",
+      "quote": {
+        "amount": "1000",
+        "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+        "extra": {
+          "name": "USD Coin",
+          "version": "2"
+        },
+        "maxTimeoutSeconds": 120,
+        "network": "eip155:8453",
+        "payTo": "0xec84c1cd6602bbe387bc8e6f0d3c062f2762de28",
+        "scheme": "exact"
+      },
+      "callId": "47dd9d5e-dbad-4bcf-a7a6-b73c429483b8",
+      "requestKey": "alsp-offline-ctx-0001",
+      "requestHash": "8060e6e09fc39b97991b2779c199dceca7eaaeda9aacb5cbc2781e32ef8b0a80",
+      "nonce": "0x2e0e86de43de9e3baf3280816beb8a3aa5b5add43748dd194a6b706bdcfdf70b",
+      "transaction": "0xcafd958eca0c63de266be14fc5c3ceb2ee39198d56fd454510700ecf497ee7a5",
+      "requestId": "unsigned:0x2e0e86de43de9e3baf3280816beb8a3aa5b5add43748dd194a6b706bdcfdf70b",
+      "signer": "none",
+      "wireStatus": 200,
+      "wireBody": {
+        "note": "Not a Maha response schema and contains no compiled context.",
+        "outputHash": "sha256:60e050833adb61a1ef90d2a403e4e625d68a22f9f8fee328daa1b4a5f6d74f37",
+        "syntheticFixture": true
+      },
+      "callState": "CLOSED",
+      "verifiedSpent": "1000",
+      "unresolved": 0
+    },
+    "noWireAndUnrecoverableOutput": {
+      "termsHash": "e38d207ebc603c49963e1685abf147185980076cd553ec2cb420c2beb8ba5ca3",
+      "termsProfile": "alsp-exact-session-v0.2",
+      "resource": "https://www.mahastrategies.com/api/v1/compress",
+      "quote": {
+        "amount": "1000",
+        "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+        "extra": {
+          "name": "USD Coin",
+          "version": "2"
+        },
+        "maxTimeoutSeconds": 120,
+        "network": "eip155:8453",
+        "payTo": "0xec84c1cd6602bbe387bc8e6f0d3c062f2762de28",
+        "scheme": "exact"
+      },
+      "callId": "558e0f77-ed2b-4cba-9a5c-35cd53af4e5c",
+      "requestKey": "alsp-offline-ctx-0001",
+      "requestHash": "8060e6e09fc39b97991b2779c199dceca7eaaeda9aacb5cbc2781e32ef8b0a80",
+      "nonce": "0xe9f02b08e1d6465ee735c2fdb54008c3e89e1a034a3970e84c0d3efe0f0d757a",
+      "transaction": null,
+      "requestId": null,
+      "signer": null,
+      "wireStatus": null,
+      "wireBody": null,
+      "callState": "RECONCILIATION_REQUIRED",
+      "verifiedSpent": "0",
+      "unresolved": 1
+    },
+    "lostThenBodylessRecovery": {
+      "before": {
+        "termsHash": "e38d207ebc603c49963e1685abf147185980076cd553ec2cb420c2beb8ba5ca3",
+        "termsProfile": "alsp-exact-session-v0.2",
+        "resource": "https://www.mahastrategies.com/api/v1/compress",
+        "quote": {
+          "amount": "1000",
+          "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+          "extra": {
+            "name": "USD Coin",
+            "version": "2"
+          },
+          "maxTimeoutSeconds": 120,
+          "network": "eip155:8453",
+          "payTo": "0xec84c1cd6602bbe387bc8e6f0d3c062f2762de28",
+          "scheme": "exact"
+        },
+        "callId": "ce7d30bc-1cd1-421f-a51b-bbc747263109",
+        "requestKey": "alsp-offline-ctx-0001",
+        "requestHash": "8060e6e09fc39b97991b2779c199dceca7eaaeda9aacb5cbc2781e32ef8b0a80",
+        "nonce": "0x1c832cdf540ba16f1d84beb5604a4c00b89fe587371cb04dd031f0b41815870a",
+        "transaction": null,
+        "requestId": null,
+        "signer": null,
+        "wireStatus": null,
+        "wireBody": null,
+        "callState": "RECONCILIATION_REQUIRED",
+        "verifiedSpent": "0",
+        "unresolved": 1
+      },
+      "after": {
+        "termsHash": "e38d207ebc603c49963e1685abf147185980076cd553ec2cb420c2beb8ba5ca3",
+        "termsProfile": "alsp-exact-session-v0.2",
+        "resource": "https://www.mahastrategies.com/api/v1/compress",
+        "quote": {
+          "amount": "1000",
+          "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+          "extra": {
+            "name": "USD Coin",
+            "version": "2"
+          },
+          "maxTimeoutSeconds": 120,
+          "network": "eip155:8453",
+          "payTo": "0xec84c1cd6602bbe387bc8e6f0d3c062f2762de28",
+          "scheme": "exact"
+        },
+        "callId": "ce7d30bc-1cd1-421f-a51b-bbc747263109",
+        "requestKey": "alsp-offline-ctx-0001",
+        "requestHash": "8060e6e09fc39b97991b2779c199dceca7eaaeda9aacb5cbc2781e32ef8b0a80",
+        "nonce": "0x1c832cdf540ba16f1d84beb5604a4c00b89fe587371cb04dd031f0b41815870a",
+        "transaction": "0xa8c9a183749cb5d555e8d9b8ab7384a2854445d721834ebfe3fa19e3dba9ba17",
+        "requestId": "unsigned:0x1c832cdf540ba16f1d84beb5604a4c00b89fe587371cb04dd031f0b41815870a",
+        "signer": "none",
+        "wireStatus": 200,
+        "wireBody": null,
+        "callState": "CLOSED",
+        "verifiedSpent": "1000",
+        "unresolved": 0
+      }
+    },
+    "directHttp200NullBody": {
+      "termsHash": "e38d207ebc603c49963e1685abf147185980076cd553ec2cb420c2beb8ba5ca3",
+      "termsProfile": "alsp-exact-session-v0.2",
+      "resource": "https://www.mahastrategies.com/api/v1/compress",
+      "quote": {
+        "amount": "1000",
+        "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+        "extra": {
+          "name": "USD Coin",
+          "version": "2"
+        },
+        "maxTimeoutSeconds": 120,
+        "network": "eip155:8453",
+        "payTo": "0xec84c1cd6602bbe387bc8e6f0d3c062f2762de28",
+        "scheme": "exact"
+      },
+      "callId": "4adbc6d5-df3c-4c8d-8979-cbc7207e008f",
+      "requestKey": "alsp-offline-ctx-0001",
+      "requestHash": "8060e6e09fc39b97991b2779c199dceca7eaaeda9aacb5cbc2781e32ef8b0a80",
+      "nonce": "0xa51da32cf13e2fccf7218118aa472d8f58798b2250a819498ca0f9a2a773401b",
+      "transaction": "0x47d2e89d1a8f8060910e2ce54c2c879348ea99ab9a4ed6b2f9aaf53a81326e2f",
+      "requestId": "unsigned:0xa51da32cf13e2fccf7218118aa472d8f58798b2250a819498ca0f9a2a773401b",
+      "signer": "none",
+      "wireStatus": 200,
+      "wireBody": null,
+      "callState": "CLOSED",
+      "verifiedSpent": "1000",
+      "unresolved": 0
+    }
+  },
+  "digestExample": {
+    "nativeRequestHashFromSuccessFixture": "8060e6e09fc39b97991b2779c199dceca7eaaeda9aacb5cbc2781e32ef8b0a80",
+    "means": "This hash binds endpoint plus ALSP-normalized input; it is not the provider inputHash."
+  }
+}
