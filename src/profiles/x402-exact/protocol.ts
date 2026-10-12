@@ -1,6 +1,8 @@
 import { createHash } from 'node:crypto';
 
 export const PROFILE = 'alsp-exact-session-v0.2';
+const MAX_JSON_REQUEST_BYTES = 1024 * 1024;
+const DEFAULT_JSON_REQUEST_BYTES = 64 * 1024;
 export type ObjectValue = Record<string, unknown>;
 export function object(value: unknown): ObjectValue {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Expected an object');
@@ -74,6 +76,10 @@ export interface ProviderProfile {
   endpointPath: string;
   /** HTTP method of the paid endpoint. */
   method: 'GET' | 'POST';
+  /** Explicit opt-in to a canonical JSON POST body; absent means the original query transport. */
+  requestEncoding?: 'query' | 'json';
+  /** Maximum canonical JSON body bytes (default 64 KiB; hard limit 1 MiB). JSON profiles only. */
+  maxRequestBytes?: number;
   /** Optional unpaid public signer metadata path. */
   signerPath?: string;
   /** CAIP-2 network identifier, e.g. `eip155:8453`. */
@@ -85,8 +91,8 @@ export interface ProviderProfile {
   /** Receipt binding. `signed` (default) expects Doctor's eip191-canonical-json-v1 receipt bound to route/input/payment;
    *  `unsigned` providers return plain JSON and are verified by RPC-confirmed settlement only. */
   receipt: { mode?: 'signed' | 'unsigned'; route?: string; service?: string; certHeader?: string };
-  /** Validates/normalizes request parameters. Defaults to flat string query parameters. */
-  input?: (value: unknown) => Record<string, string>;
+  /** Validates/normalizes request input. Defaults to flat query strings or a JSON object, by encoding. */
+  input?: (value: unknown) => RequestInput;
   /** Validates the paid response body shape before signature checks. */
   validateBody?: (body: ObjectValue) => void;
 }
@@ -110,6 +116,7 @@ export function defineProvider(profile: ProviderProfile): ProviderProfile {
   pathOf(p.endpointPath);
   if (p.signerPath !== undefined) pathOf(p.signerPath);
   if (p.method !== 'GET' && p.method !== 'POST') throw new Error('Invalid provider method');
+  requestLimit(p);
   chainIdOf(p.network);
   address(p.asset.address); text(p.asset.name); text(p.asset.version);
   address(p.payTo);
@@ -199,13 +206,49 @@ export function validateTerms(t: Terms, p: ProviderProfile = DOCTOR_PROVIDER): v
   canonical(t);
 }
 export type RequestInput = Record<string, unknown>;
-export function inputOf(value: RequestInput, p: ProviderProfile = DOCTOR_PROVIDER): Record<string, string> {
-  return (p.input ?? genericInput)(value);
+function requestLimit(p: ProviderProfile): number {
+  if (p.requestEncoding !== undefined && p.requestEncoding !== 'query' && p.requestEncoding !== 'json') throw new Error('Invalid request encoding');
+  if (p.requestEncoding === 'json' && p.method !== 'POST') throw new Error('JSON request encoding requires POST');
+  if (p.maxRequestBytes !== undefined && (p.requestEncoding !== 'json' || !Number.isSafeInteger(p.maxRequestBytes) || p.maxRequestBytes < 1 || p.maxRequestBytes > MAX_JSON_REQUEST_BYTES)) throw new Error('Invalid JSON request byte limit');
+  return p.maxRequestBytes ?? DEFAULT_JSON_REQUEST_BYTES;
+}
+function plainJson(value: unknown, depth = 0): void {
+  if (depth > 64) throw new Error('JSON nesting exceeds limit');
+  if (value === null || typeof value === 'string' || typeof value === 'boolean' || (typeof value === 'number' && Number.isFinite(value))) return;
+  if (!value || typeof value !== 'object' || (!Array.isArray(value) && ![Object.prototype, null].includes(Object.getPrototypeOf(value)))) throw new Error('Only finite plain JSON values are supported');
+  for (const key of Reflect.ownKeys(value)) {
+    if (Array.isArray(value) && key === 'length') continue;
+    const descriptor = Object.getOwnPropertyDescriptor(value, key)!;
+    if (typeof key !== 'string' || !descriptor.enumerable || !('value' in descriptor) || (Array.isArray(value) && (!/^(0|[1-9][0-9]*)$/.test(key) || Number(key) >= value.length))) throw new Error('Only plain JSON properties are supported');
+    plainJson(descriptor.value, depth + 1);
+  }
+}
+/** Own a plain JSON snapshot; never retain caller-owned nested objects after validation. */
+export function inputOf(value: RequestInput, p: ProviderProfile = DOCTOR_PROVIDER): RequestInput {
+  const limit = requestLimit(p), json = p.requestEncoding === 'json';
+  if (json) plainJson(object(value));
+  // Validators may normalize in place, but must never mutate the caller or a frozen adapter copy.
+  const normalized = (p.input ?? (json ? object : genericInput))(structuredClone(value));
+  if (json) plainJson(normalized);
+  const snapshot = structuredClone(object(normalized));
+  const serialized = canonical(snapshot);
+  if (json && Buffer.byteLength(serialized, 'utf8') > limit) throw new Error('JSON request body too large');
+  if (!json && Object.values(snapshot).some(v => typeof v !== 'string')) throw new Error('Query request parameters must be strings');
+  return snapshot;
 }
 export function requestUrl(terms: Terms, input: RequestInput, p: ProviderProfile = DOCTOR_PROVIDER): string {
-  const url = new URL(terms.endpoint);
-  for (const [k, v] of Object.entries(inputOf(input, p))) url.searchParams.set(k, v);
+  const url = new URL(terms.endpoint), normalized = inputOf(input, p);
+  if (p.requestEncoding === 'json') {
+    if (url.search || url.hash) throw new Error('JSON endpoint must not contain a query or fragment');
+    return url.href;
+  }
+  for (const [k, v] of Object.entries(normalized)) url.searchParams.set(k, v as string);
   return url.href;
+}
+/** The exact canonical bytes used on both the unpaid probe and paid JSON submission. */
+export function requestBody(input: RequestInput, p: ProviderProfile = DOCTOR_PROVIDER): string | undefined {
+  requestLimit(p);
+  return p.requestEncoding === 'json' ? canonical(inputOf(input, p)) : undefined;
 }
 export interface Quote {
   x402Version: 2;

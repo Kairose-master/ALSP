@@ -1,26 +1,39 @@
 import { verifyPriceAgreement } from './price-agreement.js';
 import { Journal, type Call } from './journal.js';
-import { requestUrl, selectQuote, validatePrepared, type Prepared, type Quote, type RequestInput, type Terms, type Verified, type WireResponse } from './protocol.js';
+import { inputOf, requestUrl, selectQuote, validatePrepared, type Prepared, type Quote, type RequestInput, type Terms, type Verified, type WireResponse } from './protocol.js';
 
 export interface SessionAdapters {
-  probe(url: string): Promise<unknown>;
+  probe(url: string, input?: RequestInput): Promise<unknown>;
   prepare(quote: Quote, terms: Terms, nonce: string, now: number): Promise<Prepared>;
-  send(url: string, prepared: Prepared): Promise<WireResponse>;
+  send(url: string, prepared: Prepared, input?: RequestInput): Promise<WireResponse>;
   verify(call: Call, terms: Terms): Promise<Verified>;
+}
+function immutableInput(input: RequestInput): RequestInput {
+  const freeze = (value: unknown): void => {
+    if (value && typeof value === 'object') {
+      for (const child of Object.values(value)) freeze(child);
+      Object.freeze(value);
+    }
+  };
+  const copy = structuredClone(input);
+  freeze(copy);
+  return copy;
 }
 export class SessionClient {
   constructor(readonly journal: Journal, private adapters: SessionAdapters, private now = Date.now) {}
   async call(sessionId: string, key: string, input: RequestInput): Promise<Call> {
-    const existing = this.journal.find(sessionId, key, input);
+    const p = this.journal.provider;
+    // Snapshot before the first await so caller or adapter mutation cannot change the paid request.
+    const snapshot = immutableInput(inputOf(input, p));
+    const existing = this.journal.find(sessionId, key, snapshot);
     // Never re-probe, re-sign or automatically resend a persisted request.
     if (existing) return existing;
     const terms = this.journal.session(sessionId).terms;
-    const p = this.journal.provider;
     if (terms.priceAgreement) await verifyPriceAgreement(terms.priceAgreement, this.now());
-    const url = requestUrl(terms, input, p), quote = selectQuote(await this.adapters.probe(url), terms, input, p);
+    const url = requestUrl(terms, snapshot, p), quote = selectQuote(await this.adapters.probe(url, immutableInput(snapshot)), terms, snapshot, p);
     // Recheck after a slow probe, before reserving or asking for a payment signature.
     if (terms.priceAgreement) await verifyPriceAgreement(terms.priceAgreement, this.now());
-    const reserved = this.journal.reserve(sessionId, key, input, quote, this.now());
+    const reserved = this.journal.reserve(sessionId, key, snapshot, quote, this.now());
     if (!reserved.created) return reserved.call;
     const c = reserved.call;
     try {
@@ -28,7 +41,8 @@ export class SessionClient {
       validatePrepared(prepared, quote, terms, c.nonce, this.now());
       this.journal.prepared(c.id, prepared);
       this.journal.submitted(c.id, this.now()); // durable commit BEFORE network side effect
-      const wire = await this.adapters.send(url, prepared);
+      const persistedInput = immutableInput(this.journal.call(c.id).input);
+      const wire = await this.adapters.send(requestUrl(terms, persistedInput, p), prepared, persistedInput);
       this.journal.capture(c.id, wire); // commit BEFORE receipt/RPC validation
       await this.reconcile(c.id);
     } catch {

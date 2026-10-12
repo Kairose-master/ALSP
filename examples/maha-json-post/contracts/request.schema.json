@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Maha Context Pack request",
+  "description": "Compile task-specific, source-linked context. Source text and compiled context are processed transiently and not retained in the service ledger. Accepted by POST /api/context-packs and POST /api/v1/compress. Request limit: 450,000 bytes for x402 callers and standard API keys, 1,050,000 bytes for enterprise API keys. An x402 request is validated against this contract before its payment settles, so a rejected body is not charged.",
+  "type": "object",
+  "required": [
+    "clientRequestId",
+    "task",
+    "tokenBudget",
+    "documents"
+  ],
+  "properties": {
+    "clientRequestId": {
+      "type": "string",
+      "minLength": 8,
+      "maxLength": 120
+    },
+    "task": {
+      "type": "string",
+      "minLength": 8,
+      "maxLength": 1200
+    },
+    "tokenBudget": {
+      "type": "integer",
+      "minimum": 64,
+      "maximum": 16000,
+      "description": "A model-neutral estimated-token budget; not a provider billing count."
+    },
+    "documents": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "text"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,79}$",
+            "description": "Stable source ID, unique within the request."
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "description": "No per-document character cap: the request is bounded by its byte limit."
+          }
+        }
+      }
+    },
+    "provenance": {
+      "type": "string",
+      "enum": [
+        "full",
+        "compact",
+        "none"
+      ],
+      "default": "full",
+      "description": "Inline citation style in the rendered pack."
+    },
+    "scoring": {
+      "type": "string",
+      "enum": [
+        "bm25",
+        "keyword"
+      ],
+      "default": "bm25",
+      "description": "Passage ranker."
+    },
+    "budgetMode": {
+      "type": "string",
+      "enum": [
+        "guaranteed",
+        "estimated"
+      ],
+      "default": "guaranteed",
+      "description": "Budget enforcement mode."
+    }
+  },
+  "additionalProperties": false
+}

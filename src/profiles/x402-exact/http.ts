@@ -1,4 +1,4 @@
-import { canonical, DOCTOR_PROVIDER, object, pack, unpack, type Prepared, type ProviderProfile, type SignedPriceAgreement, type WireResponse } from './protocol.js';
+import { canonical, DOCTOR_PROVIDER, object, pack, requestBody, unpack, type Prepared, type ProviderProfile, type RequestInput, type SignedPriceAgreement, type WireResponse } from './protocol.js';
 
 export const INTEROP_USER_AGENT = 'alsp-interop/001';
 
@@ -36,9 +36,16 @@ export async function boundedFetch(url: string, init: RequestInit = {}, fetchImp
 /** x402 v2 `exact` transport for one provider profile: unpaid 402 probe and a single paid submission. */
 export function x402Transport(p: ProviderProfile, fetchImpl: typeof fetch = fetch, agreement?: SignedPriceAgreement) {
   const agreementHeaders: Record<string, string> = agreement ? { 'alsp-price-agreement': pack(agreement) } : {};
+  const request = (url: string, input?: RequestInput): Pick<RequestInit, 'body' | 'headers'> => {
+    if (p.requestEncoding !== 'json') return {};
+    if (input === undefined) throw new Error('JSON request input required');
+    if (new URL(url).search) throw new Error('JSON request URL must not contain query parameters');
+    return { body: requestBody(input, p), headers: { 'content-type': 'application/json' } };
+  };
   return {
-    async probe(url: string): Promise<unknown> {
-      const r = await boundedFetch(url, { method: p.method, headers: agreementHeaders }, fetchImpl, p);
+    async probe(url: string, input?: RequestInput): Promise<unknown> {
+      const init = request(url, input);
+      const r = await boundedFetch(url, { ...init, method: p.method, headers: { ...agreementHeaders, ...init.headers } }, fetchImpl, p);
       if (r.status !== 402) throw new Error(`Expected HTTP 402, got ${r.status}`);
       const challenge = unpack(r.headers.get('payment-required'));
       // A non-empty JSON body is a mirror, not an alternative authority.
@@ -47,9 +54,10 @@ export function x402Transport(p: ProviderProfile, fetchImpl: typeof fetch = fetc
       }
       return challenge;
     },
-    async send(url: string, payment: Prepared): Promise<WireResponse> {
+    async send(url: string, payment: Prepared, input?: RequestInput): Promise<WireResponse> {
+      const init = request(url, input);
       const payload = { x402Version: 2, resource: payment.quote.resource, accepted: payment.quote.accepted, payload: { signature: payment.signature, authorization: payment.authorization } };
-      const r = await boundedFetch(url, { method: p.method, headers: { ...agreementHeaders, 'payment-signature': pack(payload), accept: 'application/json' } }, fetchImpl, p);
+      const r = await boundedFetch(url, { ...init, method: p.method, headers: { ...agreementHeaders, ...init.headers, 'payment-signature': pack(payload), accept: 'application/json' } }, fetchImpl, p);
       const header = r.headers.get('payment-response');
       return { status: r.status, body: r.body, settlement: header ? unpack(header) : null };
     },

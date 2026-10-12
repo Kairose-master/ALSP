@@ -1,0 +1,122 @@
+{
+  "exampleVersion": "maha-json-post-lost-output-v1",
+  "syntheticOnly": true,
+  "baseCommit": "545221097a48cb6480c58b5d43e05f302acef30f",
+  "contract": {
+    "offerId": "context-compression",
+    "metadataVersion": "2026-08-10",
+    "declarationUrl": "https://www.mahastrategies.com/api/discovery/x402-offers/context-compression",
+    "resource": {
+      "method": "POST",
+      "url": "https://www.mahastrategies.com/api/v1/compress"
+    },
+    "requestSchemaUrl": "https://www.mahastrategies.com/context-pack-schema.json",
+    "observedAt": "2026-10-12",
+    "offerSnapshotSha256": "6fa66b72dcb04ca80e3a7db746cbb9b2a91cfeb4b8cb66b14a278f9c332a6988",
+    "requestSchemaSnapshotSha256": "27251cdc111fbe92a748a8f328bdb133dbdbd931bf79d7295a9b62b00d097f6b",
+    "maxRequestBytes": 450000,
+    "providerTermsVersion": null,
+    "versionCaveat": "metadataVersion is public discovery metadata, not signed provider terms or a payment quote."
+  },
+  "publicEndpointExecuted": false,
+  "livePayments": 0,
+  "liveRpcCalls": 0,
+  "actualTransportOrigin": "https://maha-json-fixture.invalid",
+  "actualNetwork": "eip155:31337",
+  "publicPaymentMetadataUsedForExecution": false,
+  "boundaries": [
+    "The real request contract is copied into an in-process synthetic provider. No Maha service, wallet, RPC, or facilitator is contacted.",
+    "Cryptographic signatures verify only an ephemeral synthetic key on a mock chain/domain; all settlement evidence is mock-settled.",
+    "Native VERIFIED/CLOSED is preserved and is not proof that a usable output was delivered.",
+    "No response is synthesized for the no-wire settlement check. Output remains unresolved and the reserved budget is not released.",
+    "Public files are redacted projections plus companion observations. Raw input, native exports, signatures, and recovery material stay in private-outbox.",
+    "Generated IDs, keys and nonces vary each run. Behavior and digest relationships are reproducible, bytes are not deterministic.",
+    "No refunds, recovery endpoint, provider storage/retention guarantees, or stronger idempotency semantics are asserted."
+  ],
+  "scenarios": [
+    {
+      "scenario": "success",
+      "native": {
+        "callState": "VERIFIED",
+        "sessionState": "CLOSED",
+        "wireResponsePresent": true,
+        "wireBodyNull": false,
+        "allocatedTotal": "1000",
+        "verifiedSpent": "1000",
+        "unresolvedCalls": 0
+      },
+      "settlement": "mock-settled",
+      "output": "observed-synthetic",
+      "counters": {
+        "probes": 1,
+        "authorizations": 1,
+        "submissions": 1,
+        "settlements": 1,
+        "refunds": 0
+      }
+    },
+    {
+      "scenario": "lost-no-wire",
+      "native": {
+        "callState": "RECONCILIATION_REQUIRED",
+        "sessionState": "RECONCILIATION_REQUIRED",
+        "wireResponsePresent": false,
+        "wireBodyNull": false,
+        "allocatedTotal": "1000",
+        "verifiedSpent": "0",
+        "unresolvedCalls": 1
+      },
+      "settlement": "mock-settled",
+      "output": "unresolved",
+      "counters": {
+        "probes": 1,
+        "authorizations": 1,
+        "submissions": 1,
+        "settlements": 1,
+        "refunds": 0
+      }
+    },
+    {
+      "scenario": "lost-recovered-null",
+      "native": {
+        "callState": "VERIFIED",
+        "sessionState": "CLOSED",
+        "wireResponsePresent": true,
+        "wireBodyNull": true,
+        "allocatedTotal": "1000",
+        "verifiedSpent": "1000",
+        "unresolvedCalls": 0
+      },
+      "settlement": "mock-settled",
+      "output": "unresolved",
+      "counters": {
+        "probes": 1,
+        "authorizations": 1,
+        "submissions": 1,
+        "settlements": 1,
+        "refunds": 0
+      }
+    },
+    {
+      "scenario": "null-body-200",
+      "native": {
+        "callState": "VERIFIED",
+        "sessionState": "CLOSED",
+        "wireResponsePresent": true,
+        "wireBodyNull": true,
+        "allocatedTotal": "1000",
+        "verifiedSpent": "1000",
+        "unresolvedCalls": 0
+      },
+      "settlement": "mock-settled",
+      "output": "unresolved",
+      "counters": {
+        "probes": 1,
+        "authorizations": 1,
+        "submissions": 1,
+        "settlements": 1,
+        "refunds": 0
+      }
+    }
+  ]
+}
