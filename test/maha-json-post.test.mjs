@@ -30,6 +30,8 @@ for (const fault of FAULTS) test(`Maha JSON POST: ${fault}, one authorization/su
     assert.equal(observation.queryPresent, false); assert.equal(observation.bodyPresent, true);
     assert.equal(observation.contentType, 'application/json');
     assert.equal(observation.bodySha256, companion.request.inputDigest);
+    assert.equal(observation.schemaValidation, 'valid');
+    assert.equal(observation.validationSource, 'actual serialized fetch body');
   }
   assert.match(companion.request.inputDigest, /^[a-f0-9]{64}$/);
   assert.notEqual(companion.request.inputDigest, companion.request.requestHash);
@@ -46,7 +48,13 @@ for (const fault of FAULTS) test(`Maha JSON POST: ${fault}, one authorization/su
     assert.equal(final.archive.evidence[0].wire.body, null);
     assert.equal(final.archive.evidence[0].verified.receipt.signer, 'none');
     assert.equal(companion.outputObservation.usableOutputObserved, false);
-  } else validateOutput(result.private.call.wire.body);
+  } else {
+    validateOutput(result.private.call.wire.body);
+    assert.equal(companion.outputObservation.schema.status, 'valid');
+    assert.equal(companion.outputObservation.schema.validationSource, 'transport-received JSON');
+    assert.equal(companion.outputObservation.economicValue, 'not-verified');
+  }
+  if (missing) assert.notEqual(companion.outputObservation.schema.status, 'valid');
 });
 
 test('Maha contract snapshots: explicit offer/version and valid nested synthetic input', () => {
@@ -166,6 +174,8 @@ test('Public export excludes raw input, compiled text, private keys, signatures 
     assert.ok(!publicText.includes('SYNTHETIC SOURCE ALPHA'));
     assert.ok(!publicText.includes('SYNTHETIC COMPILED OUTPUT'));
     assert.ok(!publicText.includes('synthetic-context-request-001'));
+    assert.ok(!publicText.includes('가상')); assert.ok(!publicText.includes('🚀'));
+    assert.ok(!publicText.includes('requestBodies')); assert.ok(!publicText.includes('receivedResponseBytes'));
     assert.ok(!publicText.includes('privateKey')); assert.ok(!publicText.includes('recoverableWire'));
     for (const fault of FAULTS) {
       const path = join(result.privateDir, fault, 'private-material.json');

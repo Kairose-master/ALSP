@@ -1,0 +1,29 @@
+{
+  "retrievedAt": "2026-10-12",
+  "reverifiedAt": "2026-10-13T03:48:22Z",
+  "retrieval": "Read-only HTTPS GET; both responses HTTP 200; raw bytes unchanged from the 2026-10-12 pins. No execution endpoint was called.",
+  "sources": [
+    {
+      "file": "offer.json",
+      "url": "https://www.mahastrategies.com/api/discovery/x402-offers/context-compression",
+      "sha256": "6fa66b72dcb04ca80e3a7db746cbb9b2a91cfeb4b8cb66b14a278f9c332a6988",
+      "schemaPointers": [
+        "/contract/input/schema",
+        "/contract/output/schema"
+      ]
+    },
+    {
+      "file": "request.schema.json",
+      "url": "https://www.mahastrategies.com/context-pack-schema.json",
+      "sha256": "27251cdc111fbe92a748a8f328bdb133dbdbd931bf79d7295a9b62b00d097f6b",
+      "schemaPointers": [
+        ""
+      ]
+    }
+  ],
+  "stringLengthSemantics": {
+    "unit": "Unicode code points, not UTF-16 code units, grapheme clusters or UTF-8 bytes",
+    "reference": "https://json-schema.org/draft/2020-12/json-schema-validation#section-6.3.1"
+  },
+  "scope": "POST /api/v1/compress only; shape validation does not prove authenticity, factual correctness, compression value or provider inputHash equivalence."
+}

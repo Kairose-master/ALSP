@@ -50,9 +50,9 @@ export async function runScenario(fault, options = {}) {
     const inputDigest = alsp.digest(input);
     assert.equal(call.requestHash, alsp.digest({ endpoint: h.terms.endpoint, input }));
     assert.notEqual(inputDigest, call.requestHash);
-    const outputObservation = fault === 'success'
-      ? { status: 'observed-synthetic', usableOutputObserved: true, responseBodySha256: alsp.digest(call.wire.body), providerAuthenticity: 'unattested', semanticCorrectness: 'not-verified' }
-      : { status: 'unresolved', usableOutputObserved: false, originalOutputRecoverable: false, reason: call.wire ? 'HTTP 200 with null body does not establish delivery' : 'No WireResponse or output received', refundClaimed: false };
+    const outputObservation = h.state.outputSchemaObservation.status === 'valid'
+      ? { status: 'observed-synthetic', usableOutputObserved: true, responseBodySha256: alsp.digest(call.wire.body), providerAuthenticity: 'unattested', semanticCorrectness: 'not-verified', economicValue: 'not-verified', schema: h.state.outputSchemaObservation }
+      : { status: 'unresolved', usableOutputObserved: false, originalOutputRecoverable: false, reason: call.wire?.body === null ? 'HTTP 200 with null body does not establish delivery' : 'No schema-valid output received', schema: h.state.outputSchemaObservation, refundClaimed: false };
     const companion = {
       scenario: fault,
       request: { localRequestKey: key, clientRequestIdSha256: alsp.digest(input.clientRequestId),
@@ -101,12 +101,14 @@ export async function generate({ outDir } = {}) {
     results.push(result.public.companion);
   }
   const manifest = {
-    exampleVersion: 'maha-json-post-lost-output-v1', syntheticOnly: true,
+    exampleVersion: 'maha-json-post-schema-observation-v2', syntheticOnly: true,
     baseCommit: '545221097a48cb6480c58b5d43e05f302acef30f', contract: CONTRACT,
     publicEndpointExecuted: false, livePayments: 0, liveRpcCalls: 0,
     actualTransportOrigin: 'https://maha-json-fixture.invalid', actualNetwork: 'eip155:31337',
     publicPaymentMetadataUsedForExecution: false,
     boundaries: [
+      'Request validation uses actual serialized fetch bytes; output validation uses observed response bytes and transport-received JSON against pinned official schemas.',
+      'Schema-valid unsigned output does not prove authenticity, factual correctness or economic value. Local inputDigest does not reproduce Maha inputHash.',
       'The real request contract is copied into an in-process synthetic provider. No Maha service, wallet, RPC, or facilitator is contacted.',
       'Cryptographic signatures verify only an ephemeral synthetic key on a mock chain/domain; all settlement evidence is mock-settled.',
       'Native VERIFIED/CLOSED is preserved and is not proof that a usable output was delivered.',

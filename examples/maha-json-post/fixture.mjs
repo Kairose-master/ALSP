@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { generatePrivateKey } from 'viem/accounts';
 import { keccak256, toHex, verifyTypedData } from 'viem';
 import * as alsp from '../../dist/index.js';
-import { CONTRACT, validateRequest, validateOutput } from './contract.mjs';
+import { CONTRACT, sha256Bytes, validateRequest, validateSerializedRequest, validateOutput, validateReceivedOutput } from './contract.mjs';
 
 export const NOW = Date.parse('2026-10-12T10:00:00.000Z');
 export const MOCK_NETWORK = 'eip155:31337';
@@ -18,17 +18,17 @@ const json = (status, body, headers = {}) => new Response(JSON.stringify(body), 
 export function syntheticInput() {
   return {
     clientRequestId: 'synthetic-context-request-001',
-    task: 'Find the synthetic release condition and rollback trigger.',
+    task: 'Find the synthetic release condition and rollback trigger. 가상 배포 조건과 복구 기준을 확인해요. 🚀',
     tokenBudget: 128,
     documents: [
-      { id: 'synthetic-release', title: 'Synthetic release note', text: 'SYNTHETIC SOURCE ALPHA: Release the imaginary service after all local checks pass. This is invented test data, not an operational instruction.' },
-      { id: 'synthetic-rollback', title: 'Synthetic rollback note', text: 'SYNTHETIC SOURCE BETA: Roll back the imaginary service if its simulated error counter exceeds two. This is invented test data.' },
+      { id: 'synthetic-release', title: 'Synthetic release note / 가상 배포 🚀', text: 'SYNTHETIC SOURCE ALPHA: Release the imaginary service after all local checks pass. This is invented test data, not an operational instruction. 가상 자료입니다. 🧪 e\u0301' },
+      { id: 'synthetic-rollback', title: 'Synthetic rollback note / 가상 복구 🔄', text: 'SYNTHETIC SOURCE BETA: Roll back the imaginary service if its simulated error counter exceeds two. This is invented test data. 테스트 자료예요. 👩‍💻' },
     ],
     provenance: 'compact', scoring: 'bm25', budgetMode: 'guaranteed',
   };
 }
 function syntheticOutput(input) {
-  const context = 'SYNTHETIC COMPILED OUTPUT: Local checks precede the imaginary release; a simulated error count above two triggers rollback.';
+  const context = 'SYNTHETIC COMPILED OUTPUT: Local checks precede the imaginary release; a simulated error count above two triggers rollback. 가상 결과입니다. 🚀';
   // Schema-shaped synthetic output only. Hash algorithms and token estimation do not claim Maha implementation parity.
   const body = {
     version: '0.1.0', packId: `ctxpack_${alsp.digest(input).slice(0, 32)}`,
@@ -39,14 +39,15 @@ function syntheticOutput(input) {
     warnings: ['Synthetic fixture: no compression service or token estimator ran.'],
     warningCodes: ['model_neutral_token_estimates', 'extractive_selection_not_verification'],
     retentionBoundaries: { selectionType: 'extractive', evidenceRetention: 'best_effort', claimVerificationPerformed: false, completenessGuaranteed: false, hallucinationPreventionGuaranteed: false, tokenCountType: 'model_neutral_estimate' },
-    inputHash: `sha256:${alsp.digest(input)}`, outputHash: `sha256:${alsp.digest(context)}`,
+    // Domain-separated placeholder deliberately differs from local inputDigest.
+    inputHash: `sha256:${alsp.digest({ syntheticProviderHash: input })}`, outputHash: `sha256:${alsp.digest(context)}`,
     sourceTextStored: false, compiledContextStored: false,
   };
   validateOutput(body);
   return body;
 }
 
-export function createFixture({ fault = 'success', journalPath = ':memory:', privateKey = generatePrivateKey() } = {}) {
+export function createFixture({ fault = 'success', journalPath = ':memory:', privateKey = generatePrivateKey(), responseTransform = response => response } = {}) {
   if (!FAULTS.includes(fault)) throw new Error('Unknown synthetic fault');
   const buyer = alsp.evmSigner(privateKey);
   const profile = alsp.defineProvider({
@@ -60,7 +61,7 @@ export function createFixture({ fault = 'success', journalPath = ':memory:', pri
   const terms = { profile: alsp.PROFILE, payer: buyer.address, provider: MOCK_PAYEE, network: MOCK_NETWORK, asset: MOCK_ASSET, endpoint,
     maxTotal: '1000', maxPerCall: '1000', maxCalls: 1, expiresAt: NOW + 600000,
     license: { uri: 'urn:alsp:synthetic:maha-json-post:v1', sha256: alsp.digest('synthetic fixture terms only'), acceptance: 'buyer-only' } };
-  const state = { fault, probes: 0, authorizations: 0, submissions: 0, settlements: 0, refunds: 0, rpcCalls: 0, observations: [], records: [], recoverableWire: null };
+  const state = { fault, probes: 0, authorizations: 0, submissions: 0, settlements: 0, refunds: 0, rpcCalls: 0, observations: [], requestBodies: [], receivedResponseBytes: null, outputSchemaObservation: { status: 'not-observed', validationSource: 'transport-received JSON' }, records: [], recoverableWire: null };
   const challenge = { x402Version: 2, resource: { url: endpoint, description: 'Synthetic contract-shaped JSON POST, not a Maha quote' }, accepts: [{ scheme: 'exact', network: MOCK_NETWORK, asset: MOCK_ASSET, payTo: MOCK_PAYEE, amount: '1000', maxTimeoutSeconds: 120, extra: { name: 'Synthetic USD', version: '1' } }] };
 
   async function fetchImpl(url, init = {}) {
@@ -71,11 +72,14 @@ export function createFixture({ fault = 'success', journalPath = ':memory:', pri
     assert.equal(init.method, 'POST');
     assert.equal(headers.get('content-type'), 'application/json');
     assert.equal(typeof init.body, 'string');
-    const input = validateRequest(JSON.parse(init.body));
+    const input = validateSerializedRequest(init.body);
     assert.equal(init.body, alsp.canonical(input));
     const paymentHeader = headers.get('payment-signature');
+    // Raw captures remain fixture-private; public projections copy only redacted observations.
+    state.requestBodies.push(init.body);
     state.observations.push({ method: init.method, path: u.pathname, contentType: headers.get('content-type'), queryPresent: false,
-      bodyPresent: true, bodySha256: alsp.digest(input), bytes: Buffer.byteLength(init.body), paymentHeaderPresent: Boolean(paymentHeader) });
+      bodyPresent: true, bodySha256: sha256Bytes(Buffer.from(init.body, 'utf8')), bytes: Buffer.byteLength(init.body, 'utf8'),
+      schemaValidation: 'valid', validationSource: 'actual serialized fetch body', paymentHeaderPresent: Boolean(paymentHeader) });
     if (!paymentHeader) { state.probes++; return json(402, challenge, { 'payment-required': alsp.pack(challenge) }); }
     state.submissions++;
     const payment = alsp.unpack(paymentHeader), auth = payment.payload.authorization;
@@ -120,8 +124,39 @@ export function createFixture({ fault = 'success', journalPath = ':memory:', pri
     }
   }
   const journal = new alsp.Journal(journalPath, profile), sessionId = journal.create(terms, NOW);
-  const transport = alsp.x402Transport(profile, fetchImpl);
+  let receivedBytes = null;
+  const transport = alsp.x402Transport(profile, async (url, init) => {
+    let response = await fetchImpl(url, init);
+    if (new Headers(init.headers).has('payment-signature')) {
+      // Test-only fault injection is after construction/validation of source output.
+      response = await responseTransform(response);
+      receivedBytes = Buffer.from(await response.clone().arrayBuffer());
+      state.receivedResponseBytes = receivedBytes;
+    }
+    return response;
+  });
   const adapters = { ...transport,
+    async send(...args) {
+      let wire;
+      try { wire = await transport.send(...args); }
+      catch (error) {
+        state.outputSchemaObservation = { status: receivedBytes ? 'invalid-json' : 'not-observed',
+          validationSource: 'transport-received JSON', ...(receivedBytes ? { wireBytes: receivedBytes.length, wireBodySha256: sha256Bytes(receivedBytes) } : {}) };
+        throw error;
+      }
+      const observation = { validationSource: 'transport-received JSON', wireBytes: receivedBytes.length, wireBodySha256: sha256Bytes(receivedBytes) };
+      if (wire.body === null) state.outputSchemaObservation = { ...observation, status: 'no-output' };
+      else {
+        try {
+          validateReceivedOutput(receivedBytes, wire.body);
+          state.outputSchemaObservation = { ...observation, status: 'valid', parsedBodySha256: alsp.digest(wire.body) };
+        } catch {
+          state.outputSchemaObservation = { ...observation, status: 'invalid', reason: 'Received JSON or UTF-8 does not satisfy pinned output contract' };
+        }
+      }
+      // Shape checking is a companion observation: never redefine native settlement state.
+      return wire;
+    },
     async prepare(...args) { state.authorizations++; return buyer.prepare(...args); },
     async verify(call, t) {
       const receipt = await alsp.verifyReceipt(call, t, [], profile, NOW);

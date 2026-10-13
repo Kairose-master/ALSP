@@ -38,15 +38,17 @@ snapshots contain Maha's already-public illustrative examples, not user data.
 Reusing an output directory fails rather than overwriting evidence. IDs, keys,
 nonces, and transaction digests vary per run; behavior is reproducible.
 
-A generated [public evidence snapshot](public-evidence/manifest.json) is checked in
-under `public-evidence/`. It contains only redacted projections and companion
-observations; the corresponding private outbox is not published.
+The [public evidence snapshot](public-evidence/manifest.json), regenerated on
+2026-10-13, includes the Unicode fixture and received-schema observations below.
+All public files contain only redacted projections and companion observations;
+the corresponding private outbox is not published. Earlier v1 evidence remains
+available in the parent commit `cd7b3264ed39d610d4b89f6fe7d121a61c9687d8`.
 
 ## What each case demonstrates
 
 | Scenario | Native final state | Separate settlement observation | Separate output observation |
 | --- | --- | --- | --- |
-| `success` | `VERIFIED` / `CLOSED` | independently checked `mock-settled` | schema-shaped synthetic output observed, unattested |
+| `success` | `VERIFIED` / `CLOSED` | independently checked `mock-settled` | received synthetic JSON schema-valid, unattested |
 | `lost-no-wire` | `RECONCILIATION_REQUIRED` | independently checked `mock-settled`, no `WireResponse` required | unresolved; no output recoverable |
 | `lost-recovered-null` | `VERIFIED` / `CLOSED` after attaching a bodyless local record | independently checked `mock-settled` | unresolved; HTTP 200/null is no output |
 | `null-body-200` | `VERIFIED` / `CLOSED` | independently checked `mock-settled` | unresolved; HTTP 200/null is no output |
@@ -119,7 +121,10 @@ binding, or raw response digest requires the private outbox.
 
 ## Pinned sources
 
-Read-only public contract snapshots retrieved on 2026-10-12:
+Read-only public contract snapshots retrieved on 2026-10-12 and independently
+re-fetched on 2026-10-13 at 03:48 UTC. Both official responses were HTTP 200 and
+byte-for-byte unchanged. URLs, exact raw hashes, schema pointers and verification
+time are pinned in `contracts/provenance.json`; loading fails on a hash mismatch:
 
 - [Discovery offer](https://www.mahastrategies.com/api/discovery/x402-offers/context-compression),
   `contracts/offer.json`, raw SHA-256
@@ -128,10 +133,61 @@ Read-only public contract snapshots retrieved on 2026-10-12:
   `contracts/request.schema.json`, raw SHA-256
   `27251cdc111fbe92a748a8f328bdb133dbdbd931bf79d7295a9b62b00d097f6b`.
 
-The fixture validates against both pinned request-schema representations and
-also checks unique document IDs. Its small local validator implements only the
-keywords used in these snapshots, not all of JSON Schema. Runtime generation
-never refreshes these documents or calls their URLs.
+The output contract is the published `/contract/output/schema` object inside
+`contracts/offer.json`. It is not a guessed response contract or a new endpoint.
+The fixture validates both pinned request-schema representations and also checks
+unique document IDs. The small local validator implements only the keywords in
+these snapshots, not all of JSON Schema; unsupported schema types/keywords fail
+closed when loading the pins. Runtime generation never refreshes these documents
+or calls their URLs. No dependencies were added.
+
+## Observed schema and Unicode checks
+
+After installing the lockfile dependencies, invoke the installed tools directly
+to avoid npm update notifications/optional registry checks:
+
+```sh
+node node_modules/typescript/bin/tsc -p tsconfig.json
+node --test test/maha-json-post.test.mjs test/maha-schema-compatibility.test.mjs
+```
+
+- Both the unpaid probe and single paid mock submission validate the actual
+  serialized body at the injected fetch boundary. The byte limit applies to
+  those exact bytes, including escapes/whitespace, rather than a re-serialized
+  approximation. Public request observations record the raw body digest and
+  byte count, never the body itself.
+- The fixture captures bytes from the actual returned `Response` and validates
+  the JSON parsed by ALSP's real transport against the official output schema.
+  Mutations injected after mock output construction are therefore detected.
+  Public output observations separate `wireBodySha256` (raw response bytes)
+  from `parsedBodySha256` (ALSP canonical JSON). These differ for the fixture's
+  literal UTF-8 response and must not be conflated.
+- Synthetic sources contain Korean, astral emoji, combining accents and a ZWJ
+  emoji. Requests use ALSP's existing ASCII-escaped JSON, so Korean characters
+  occupy six wire bytes and an astral emoji occupies twelve. Responses use
+  literal UTF-8. Round-trip checks preserve code points without normalization.
+- JSON Schema string bounds count Unicode code points, not JavaScript UTF-16
+  length, grapheme clusters or bytes. The regressions exercise 8/120 request-ID,
+  8/1,200 task, 160 title and exact 450,000-byte request boundaries. A combining
+  accent/ZWJ sequence can comprise several code points. See the
+  [JSON Schema string-length definition](https://json-schema.org/draft/2020-12/json-schema-validation#section-6.3.1).
+- Required fields, nested arrays/objects, constants, enums, patterns, numeric
+  bounds, malformed JSON and invalid UTF-8 have negative cases. A distinct
+  synthetic placeholder supplies response `inputHash`; it deliberately differs
+  from local `inputDigest` and does not implement Maha's canonical hash.
+
+Schema results are companion evidence, independent of native receipt/settlement
+verification. A schema-invalid HTTP 200 response can still be native `VERIFIED`;
+its companion reports `invalid`. Empty/null bodies report `no-output`; no-wire
+loss reports `not-observed`. Malformed JSON remains unresolved. The unchanged
+native transport replacement-decodes invalid UTF-8, which the stricter companion
+flags independently; this change does not harden the production decoder.
+
+Schema-valid unsigned output does not establish authenticity, factual correctness,
+compression quality, economic value, cross-field consistency or hash-algorithm
+parity. Tests explicitly show that invented content and inconsistent metric/hash
+values can satisfy the published structural schema. This is offline compatibility
+coverage, not a live Maha interoperability result.
 
 Base implementation: ALSP main
 `545221097a48cb6480c58b5d43e05f302acef30f`, verified 2026-10-12.
@@ -141,11 +197,18 @@ its query-only transport observation is not relabeled as JSON support.
 
 ## Tests and limits
 
+Verified 2026-10-13 on Node 24.19.0: **146 tests passed** (including 34 new
+schema/Unicode regressions), build and typecheck passed. The full suite was run
+with npm update checks disabled and offline mode enabled; the focused Maha
+suite runs directly with the installed Node/TypeScript tools.
+
 `test/maha-json-post.test.mjs` covers the four cases, request contract boundaries,
 invalid input before authorization, distinct digests, key replay/conflict,
 reserved-budget retention, independent settlement tampering, and public/private
 file separation. `test/json-transport.test.mjs` covers opt-in transport and
-compatibility/mutation boundaries. `npm test` also runs all existing tests.
+compatibility/mutation boundaries. `test/maha-schema-compatibility.test.mjs` adds
+observed-wire, response-contract and Unicode regressions. `npm test` runs all
+existing tests as well.
 
 No live provider execution/payment, live settlement, provider cross-check,
 browser UI/multi-tab behavior, public deployment, push, or PR is part of this

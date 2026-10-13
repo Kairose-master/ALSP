@@ -4,9 +4,9 @@
     "request": {
       "localRequestKey": "synthetic-local-purchase-001",
       "clientRequestIdSha256": "8361cdc65f814007797eec506b6bd00cc41e73b05012ca75c36fe50e8afbefa5",
-      "inputDigest": "33d2e502553482d65f334cc4cb7895e1ebbd26e1122171d6e54503d8cf96cf0a",
+      "inputDigest": "badf876e431775583a07395145566bacfe4a15a238d94e84e370bec7bc752411",
       "inputDigestAlgorithm": "bare lowercase hex SHA-256 of canonical input only",
-      "requestHash": "83448e3a93e2bdea8f5ad41b6dc38c5d0bb78df0de5d6563137b5a9a77fc1369",
+      "requestHash": "f141b1c1a6f1351862841299a74b80c3d7f0f4c6f01d03d5dbba9cd3180a8421",
       "requestHashAlgorithm": "SHA-256(canonical({endpoint,input}))",
       "providerInputHashClaimed": false,
       "caveat": "Local bare input digest is distinct from endpoint-bound requestHash; neither claims Maha inputHash algorithm parity.",
@@ -17,8 +17,10 @@
           "contentType": "application/json",
           "queryPresent": false,
           "bodyPresent": true,
-          "bodySha256": "33d2e502553482d65f334cc4cb7895e1ebbd26e1122171d6e54503d8cf96cf0a",
-          "bytes": 627,
+          "bodySha256": "badf876e431775583a07395145566bacfe4a15a238d94e84e370bec7bc752411",
+          "bytes": 967,
+          "schemaValidation": "valid",
+          "validationSource": "actual serialized fetch body",
           "paymentHeaderPresent": false
         },
         {
@@ -27,8 +29,10 @@
           "contentType": "application/json",
           "queryPresent": false,
           "bodyPresent": true,
-          "bodySha256": "33d2e502553482d65f334cc4cb7895e1ebbd26e1122171d6e54503d8cf96cf0a",
-          "bytes": 627,
+          "bodySha256": "badf876e431775583a07395145566bacfe4a15a238d94e84e370bec7bc752411",
+          "bytes": 967,
+          "schemaValidation": "valid",
+          "validationSource": "actual serialized fetch body",
           "paymentHeaderPresent": true
         }
       ]
@@ -47,7 +51,7 @@
       "evidenceSource": "in-process mock ledger; independently checked from transaction locator",
       "wireResponseRequired": false,
       "proof": {
-        "transaction": "0x0b0112edd9d789805472f4b6668508f685d8f51fa27d0150e0c463a0062df5fa",
+        "transaction": "0x700c2dacbd1ff3492bddef1a0ba33c56813a03e649e702b140778d282862a799",
         "blockHash": "0xdb5c861fee65eed9911e54354c113904dc9912aeb410b275c96bce1ef01272eb",
         "blockNumber": "1",
         "confirmations": 2,
@@ -57,9 +61,17 @@
     "outputObservation": {
       "status": "observed-synthetic",
       "usableOutputObserved": true,
-      "responseBodySha256": "31bc263ba20ecd30c9379776c720f8632f1fd26789297187334421d073dbec71",
+      "responseBodySha256": "a2c958bd19e6f39a49deb1cd665aa5bd8178c70d3dfbdc68a9c650eb8ec41548",
       "providerAuthenticity": "unattested",
-      "semanticCorrectness": "not-verified"
+      "semanticCorrectness": "not-verified",
+      "economicValue": "not-verified",
+      "schema": {
+        "validationSource": "transport-received JSON",
+        "wireBytes": 2591,
+        "wireBodySha256": "3c40c3860dc873277891fcdd2d556c604820bda20f363c6e15b43ac8ad4a7212",
+        "status": "valid",
+        "parsedBodySha256": "a2c958bd19e6f39a49deb1cd665aa5bd8178c70d3dfbdc68a9c650eb8ec41548"
+      }
     },
     "counters": {
       "probes": 1,
@@ -72,7 +84,7 @@
   },
   "initial": {
     "kind": "redacted-native-archive-projection",
-    "sourceArchiveSha256": "c7e532a4bbb439c8afca7374f184c3e5d016b3053e62d2aa84978c592b07c539",
+    "sourceArchiveSha256": "cc8ed610f6955e952942bdeef14520f99a53644befb0aaea7f630b1deda74e18",
     "redactions": [
       "evidence[].input",
       "evidence[].wire.body when non-null"
@@ -81,7 +93,7 @@
     "eventChainValid": true,
     "archive": {
       "profile": "alsp-exact-session-v0.2",
-      "sessionId": "6aa1bcf6-eaef-4b67-8303-5494e0ef61af",
+      "sessionId": "6944a5c9-26b9-49f6-af56-f346e3a22009",
       "terms": {
         "asset": "0x0000000000000000000000000000000000031337",
         "endpoint": "https://maha-json-fixture.invalid/api/v1/compress",
@@ -95,74 +107,74 @@
         "maxPerCall": "1000",
         "maxTotal": "1000",
         "network": "eip155:31337",
-        "payer": "0xb28C7b0410766862EE76DBE6aD326a953208a405",
+        "payer": "0x00a09E4DEDDE5FA28e9117D52a1b7869fED421c4",
         "profile": "alsp-exact-session-v0.2",
         "provider": "0x0000000000000000000000000000000000000042"
       },
-      "termsHash": "9d46d9c518fa805c66c1cda0ffde63d956bedb6a268a3680bf0ebfe420706fcf",
-      "headHash": "43d8a5ff6862ea06606c9f87f35c9ac160b51294f12932c853cc2ea5e0ba4de1",
+      "termsHash": "712572fc7f4b222a5905c2e15efa3dfd6527b060338a39af25866fea863005e5",
+      "headHash": "6694aa272449d134f251ef7ec62bc18a31961007690bf1ea8367df43bee64292",
       "events": [
         {
           "seq": 1,
-          "previous": "9ecef8885892c0d45ee5a3a1ae1534f899fb02d8c8b2bb064928cc43b45676b5",
-          "head": "10501afb1b2885b22d18b1cb8d49842f3f775600e175fb05f74f0f5fb6df5aac",
+          "previous": "95b9628f814125a2d8a22f26a0493b5fe354947473ab7c9a5ec2a30b30d3ba0b",
+          "head": "ed901b82494dc20b78c3ce601bcf6b076b92a6a5d2b7305e1b90ed01e28dab71",
           "event": {
             "amount": "1000",
-            "callId": "783d42a2-93b8-465f-a493-160cb6822465",
+            "callId": "2535f540-0ff0-464c-8b0c-caf345654122",
             "kind": "reserved",
-            "nonce": "0xcca6068b2a8e01c0e724ed5586b1dba49ccde4cdd77db9c1a03e7b1e722fbcfe",
-            "requestHash": "83448e3a93e2bdea8f5ad41b6dc38c5d0bb78df0de5d6563137b5a9a77fc1369",
+            "nonce": "0x09294a88538567c015e236e542db1a0be72bb20b47b40e8ee5737538ebe0485c",
+            "requestHash": "f141b1c1a6f1351862841299a74b80c3d7f0f4c6f01d03d5dbba9cd3180a8421",
             "requestKey": "synthetic-local-purchase-001"
           }
         },
         {
           "seq": 2,
-          "previous": "10501afb1b2885b22d18b1cb8d49842f3f775600e175fb05f74f0f5fb6df5aac",
-          "head": "c3f58ab6f10ce3fac711dc0c7206501986ed5c296c15be5d9197134c9055b83b",
+          "previous": "ed901b82494dc20b78c3ce601bcf6b076b92a6a5d2b7305e1b90ed01e28dab71",
+          "head": "49de01e1806c53ad7b4464088f6befe5af2653c949c1a961b6a18393650ffe6e",
           "event": {
-            "callId": "783d42a2-93b8-465f-a493-160cb6822465",
+            "callId": "2535f540-0ff0-464c-8b0c-caf345654122",
             "kind": "authorized",
-            "paymentHash": "c4340637fc9ff9558ba7d393e2f22e5ff7de9197e490a20fcc4fe356af902fa2"
+            "paymentHash": "dd90e56ddc79ca37501f9812ead8bf9a18e99b9c4a033a4e51fbb86c90ee6ac4"
           }
         },
         {
           "seq": 3,
-          "previous": "c3f58ab6f10ce3fac711dc0c7206501986ed5c296c15be5d9197134c9055b83b",
-          "head": "cf952c58af5a92b209cf4df897709f774c945c22c7a483825c83c41d2198b0bd",
+          "previous": "49de01e1806c53ad7b4464088f6befe5af2653c949c1a961b6a18393650ffe6e",
+          "head": "0fba0b3cb402ab7a2b31bfaa05e6a0e098f8eaac89e1e017da2fef3d688bae71",
           "event": {
-            "callId": "783d42a2-93b8-465f-a493-160cb6822465",
+            "callId": "2535f540-0ff0-464c-8b0c-caf345654122",
             "kind": "submission_intent"
           }
         },
         {
           "seq": 4,
-          "previous": "cf952c58af5a92b209cf4df897709f774c945c22c7a483825c83c41d2198b0bd",
-          "head": "256c56404a9c9f307d44d0797a88cfb9f9d3d96ebd79f1663b6755b90812511d",
+          "previous": "0fba0b3cb402ab7a2b31bfaa05e6a0e098f8eaac89e1e017da2fef3d688bae71",
+          "head": "2826f642381e6c777a1c23309488c9e20f427d42716540d8721893713d01eeaa",
           "event": {
-            "callId": "783d42a2-93b8-465f-a493-160cb6822465",
+            "callId": "2535f540-0ff0-464c-8b0c-caf345654122",
             "kind": "response",
-            "responseHash": "813a48632a6d5a6c11bc66a59c810b872becc035ab360130b89c5c2ede9f4e20"
+            "responseHash": "b5c7292ca72e5eb6a6bc54219a111f95397e791f5d6a7806d0f73a99337c0735"
           }
         },
         {
           "seq": 5,
-          "previous": "256c56404a9c9f307d44d0797a88cfb9f9d3d96ebd79f1663b6755b90812511d",
-          "head": "43d8a5ff6862ea06606c9f87f35c9ac160b51294f12932c853cc2ea5e0ba4de1",
+          "previous": "2826f642381e6c777a1c23309488c9e20f427d42716540d8721893713d01eeaa",
+          "head": "6694aa272449d134f251ef7ec62bc18a31961007690bf1ea8367df43bee64292",
           "event": {
             "amount": "1000",
-            "callId": "783d42a2-93b8-465f-a493-160cb6822465",
+            "callId": "2535f540-0ff0-464c-8b0c-caf345654122",
             "kind": "verified",
             "proof": {
               "ledger": {
                 "blockHash": "0xdb5c861fee65eed9911e54354c113904dc9912aeb410b275c96bce1ef01272eb",
                 "blockNumber": "1",
                 "confirmations": 2,
-                "transaction": "0x0b0112edd9d789805472f4b6668508f685d8f51fa27d0150e0c463a0062df5fa",
+                "transaction": "0x700c2dacbd1ff3492bddef1a0ba33c56813a03e649e702b140778d282862a799",
                 "verification": "mock-settled"
               },
               "receipt": {
-                "requestId": "unsigned:0xcca6068b2a8e01c0e724ed5586b1dba49ccde4cdd77db9c1a03e7b1e722fbcfe",
-                "responseHash": "31bc263ba20ecd30c9379776c720f8632f1fd26789297187334421d073dbec71",
+                "requestId": "unsigned:0x09294a88538567c015e236e542db1a0be72bb20b47b40e8ee5737538ebe0485c",
+                "responseHash": "a2c958bd19e6f39a49deb1cd665aa5bd8178c70d3dfbdc68a9c650eb8ec41548",
                 "signedAt": "2026-10-12T10:00:00.000Z",
                 "signer": "none"
               },
@@ -183,10 +195,10 @@
       },
       "evidence": [
         {
-          "callId": "783d42a2-93b8-465f-a493-160cb6822465",
+          "callId": "2535f540-0ff0-464c-8b0c-caf345654122",
           "input": {
             "redacted": true,
-            "sha256": "33d2e502553482d65f334cc4cb7895e1ebbd26e1122171d6e54503d8cf96cf0a"
+            "sha256": "badf876e431775583a07395145566bacfe4a15a238d94e84e370bec7bc752411"
           },
           "quote": {
             "accepted": {
@@ -207,17 +219,17 @@
             },
             "x402Version": 2
           },
-          "nonce": "0xcca6068b2a8e01c0e724ed5586b1dba49ccde4cdd77db9c1a03e7b1e722fbcfe",
+          "nonce": "0x09294a88538567c015e236e542db1a0be72bb20b47b40e8ee5737538ebe0485c",
           "wire": {
             "body": {
               "redacted": true,
-              "sha256": "31bc263ba20ecd30c9379776c720f8632f1fd26789297187334421d073dbec71"
+              "sha256": "a2c958bd19e6f39a49deb1cd665aa5bd8178c70d3dfbdc68a9c650eb8ec41548"
             },
             "settlement": {
               "network": "eip155:31337",
-              "payer": "0xb28C7b0410766862EE76DBE6aD326a953208a405",
+              "payer": "0x00a09E4DEDDE5FA28e9117D52a1b7869fED421c4",
               "success": true,
-              "transaction": "0x0b0112edd9d789805472f4b6668508f685d8f51fa27d0150e0c463a0062df5fa"
+              "transaction": "0x700c2dacbd1ff3492bddef1a0ba33c56813a03e649e702b140778d282862a799"
             },
             "status": 200
           },
@@ -226,12 +238,12 @@
               "blockHash": "0xdb5c861fee65eed9911e54354c113904dc9912aeb410b275c96bce1ef01272eb",
               "blockNumber": "1",
               "confirmations": 2,
-              "transaction": "0x0b0112edd9d789805472f4b6668508f685d8f51fa27d0150e0c463a0062df5fa",
+              "transaction": "0x700c2dacbd1ff3492bddef1a0ba33c56813a03e649e702b140778d282862a799",
               "verification": "mock-settled"
             },
             "receipt": {
-              "requestId": "unsigned:0xcca6068b2a8e01c0e724ed5586b1dba49ccde4cdd77db9c1a03e7b1e722fbcfe",
-              "responseHash": "31bc263ba20ecd30c9379776c720f8632f1fd26789297187334421d073dbec71",
+              "requestId": "unsigned:0x09294a88538567c015e236e542db1a0be72bb20b47b40e8ee5737538ebe0485c",
+              "responseHash": "a2c958bd19e6f39a49deb1cd665aa5bd8178c70d3dfbdc68a9c650eb8ec41548",
               "signedAt": "2026-10-12T10:00:00.000Z",
               "signer": "none"
             },
@@ -243,7 +255,7 @@
   },
   "final": {
     "kind": "redacted-native-archive-projection",
-    "sourceArchiveSha256": "e37a5c987c484d024a078ca76c97681ad8129f36b395985378c1724dc83795f2",
+    "sourceArchiveSha256": "cca1b3076149a51a0d602baeafb2ec0ead224aaf7f68beb6f167ac34af864cfe",
     "redactions": [
       "evidence[].input",
       "evidence[].wire.body when non-null"
@@ -252,7 +264,7 @@
     "eventChainValid": true,
     "archive": {
       "profile": "alsp-exact-session-v0.2",
-      "sessionId": "6aa1bcf6-eaef-4b67-8303-5494e0ef61af",
+      "sessionId": "6944a5c9-26b9-49f6-af56-f346e3a22009",
       "terms": {
         "asset": "0x0000000000000000000000000000000000031337",
         "endpoint": "https://maha-json-fixture.invalid/api/v1/compress",
@@ -266,74 +278,74 @@
         "maxPerCall": "1000",
         "maxTotal": "1000",
         "network": "eip155:31337",
-        "payer": "0xb28C7b0410766862EE76DBE6aD326a953208a405",
+        "payer": "0x00a09E4DEDDE5FA28e9117D52a1b7869fED421c4",
         "profile": "alsp-exact-session-v0.2",
         "provider": "0x0000000000000000000000000000000000000042"
       },
-      "termsHash": "9d46d9c518fa805c66c1cda0ffde63d956bedb6a268a3680bf0ebfe420706fcf",
-      "headHash": "d12260bc85f7ef70b37bd426db9a9a18fea8ffe62c9a3b6862cdcbf5f02d99fe",
+      "termsHash": "712572fc7f4b222a5905c2e15efa3dfd6527b060338a39af25866fea863005e5",
+      "headHash": "ca04f81d1d4e03813f269308021d2eec21f89d5b08274ea1ff8c8ad66e7856ef",
       "events": [
         {
           "seq": 1,
-          "previous": "9ecef8885892c0d45ee5a3a1ae1534f899fb02d8c8b2bb064928cc43b45676b5",
-          "head": "10501afb1b2885b22d18b1cb8d49842f3f775600e175fb05f74f0f5fb6df5aac",
+          "previous": "95b9628f814125a2d8a22f26a0493b5fe354947473ab7c9a5ec2a30b30d3ba0b",
+          "head": "ed901b82494dc20b78c3ce601bcf6b076b92a6a5d2b7305e1b90ed01e28dab71",
           "event": {
             "amount": "1000",
-            "callId": "783d42a2-93b8-465f-a493-160cb6822465",
+            "callId": "2535f540-0ff0-464c-8b0c-caf345654122",
             "kind": "reserved",
-            "nonce": "0xcca6068b2a8e01c0e724ed5586b1dba49ccde4cdd77db9c1a03e7b1e722fbcfe",
-            "requestHash": "83448e3a93e2bdea8f5ad41b6dc38c5d0bb78df0de5d6563137b5a9a77fc1369",
+            "nonce": "0x09294a88538567c015e236e542db1a0be72bb20b47b40e8ee5737538ebe0485c",
+            "requestHash": "f141b1c1a6f1351862841299a74b80c3d7f0f4c6f01d03d5dbba9cd3180a8421",
             "requestKey": "synthetic-local-purchase-001"
           }
         },
         {
           "seq": 2,
-          "previous": "10501afb1b2885b22d18b1cb8d49842f3f775600e175fb05f74f0f5fb6df5aac",
-          "head": "c3f58ab6f10ce3fac711dc0c7206501986ed5c296c15be5d9197134c9055b83b",
+          "previous": "ed901b82494dc20b78c3ce601bcf6b076b92a6a5d2b7305e1b90ed01e28dab71",
+          "head": "49de01e1806c53ad7b4464088f6befe5af2653c949c1a961b6a18393650ffe6e",
           "event": {
-            "callId": "783d42a2-93b8-465f-a493-160cb6822465",
+            "callId": "2535f540-0ff0-464c-8b0c-caf345654122",
             "kind": "authorized",
-            "paymentHash": "c4340637fc9ff9558ba7d393e2f22e5ff7de9197e490a20fcc4fe356af902fa2"
+            "paymentHash": "dd90e56ddc79ca37501f9812ead8bf9a18e99b9c4a033a4e51fbb86c90ee6ac4"
           }
         },
         {
           "seq": 3,
-          "previous": "c3f58ab6f10ce3fac711dc0c7206501986ed5c296c15be5d9197134c9055b83b",
-          "head": "cf952c58af5a92b209cf4df897709f774c945c22c7a483825c83c41d2198b0bd",
+          "previous": "49de01e1806c53ad7b4464088f6befe5af2653c949c1a961b6a18393650ffe6e",
+          "head": "0fba0b3cb402ab7a2b31bfaa05e6a0e098f8eaac89e1e017da2fef3d688bae71",
           "event": {
-            "callId": "783d42a2-93b8-465f-a493-160cb6822465",
+            "callId": "2535f540-0ff0-464c-8b0c-caf345654122",
             "kind": "submission_intent"
           }
         },
         {
           "seq": 4,
-          "previous": "cf952c58af5a92b209cf4df897709f774c945c22c7a483825c83c41d2198b0bd",
-          "head": "256c56404a9c9f307d44d0797a88cfb9f9d3d96ebd79f1663b6755b90812511d",
+          "previous": "0fba0b3cb402ab7a2b31bfaa05e6a0e098f8eaac89e1e017da2fef3d688bae71",
+          "head": "2826f642381e6c777a1c23309488c9e20f427d42716540d8721893713d01eeaa",
           "event": {
-            "callId": "783d42a2-93b8-465f-a493-160cb6822465",
+            "callId": "2535f540-0ff0-464c-8b0c-caf345654122",
             "kind": "response",
-            "responseHash": "813a48632a6d5a6c11bc66a59c810b872becc035ab360130b89c5c2ede9f4e20"
+            "responseHash": "b5c7292ca72e5eb6a6bc54219a111f95397e791f5d6a7806d0f73a99337c0735"
           }
         },
         {
           "seq": 5,
-          "previous": "256c56404a9c9f307d44d0797a88cfb9f9d3d96ebd79f1663b6755b90812511d",
-          "head": "43d8a5ff6862ea06606c9f87f35c9ac160b51294f12932c853cc2ea5e0ba4de1",
+          "previous": "2826f642381e6c777a1c23309488c9e20f427d42716540d8721893713d01eeaa",
+          "head": "6694aa272449d134f251ef7ec62bc18a31961007690bf1ea8367df43bee64292",
           "event": {
             "amount": "1000",
-            "callId": "783d42a2-93b8-465f-a493-160cb6822465",
+            "callId": "2535f540-0ff0-464c-8b0c-caf345654122",
             "kind": "verified",
             "proof": {
               "ledger": {
                 "blockHash": "0xdb5c861fee65eed9911e54354c113904dc9912aeb410b275c96bce1ef01272eb",
                 "blockNumber": "1",
                 "confirmations": 2,
-                "transaction": "0x0b0112edd9d789805472f4b6668508f685d8f51fa27d0150e0c463a0062df5fa",
+                "transaction": "0x700c2dacbd1ff3492bddef1a0ba33c56813a03e649e702b140778d282862a799",
                 "verification": "mock-settled"
               },
               "receipt": {
-                "requestId": "unsigned:0xcca6068b2a8e01c0e724ed5586b1dba49ccde4cdd77db9c1a03e7b1e722fbcfe",
-                "responseHash": "31bc263ba20ecd30c9379776c720f8632f1fd26789297187334421d073dbec71",
+                "requestId": "unsigned:0x09294a88538567c015e236e542db1a0be72bb20b47b40e8ee5737538ebe0485c",
+                "responseHash": "a2c958bd19e6f39a49deb1cd665aa5bd8178c70d3dfbdc68a9c650eb8ec41548",
                 "signedAt": "2026-10-12T10:00:00.000Z",
                 "signer": "none"
               },
@@ -343,8 +355,8 @@
         },
         {
           "seq": 6,
-          "previous": "43d8a5ff6862ea06606c9f87f35c9ac160b51294f12932c853cc2ea5e0ba4de1",
-          "head": "d12260bc85f7ef70b37bd426db9a9a18fea8ffe62c9a3b6862cdcbf5f02d99fe",
+          "previous": "6694aa272449d134f251ef7ec62bc18a31961007690bf1ea8367df43bee64292",
+          "head": "ca04f81d1d4e03813f269308021d2eec21f89d5b08274ea1ff8c8ad66e7856ef",
           "event": {
             "kind": "access_ended"
           }
@@ -362,10 +374,10 @@
       },
       "evidence": [
         {
-          "callId": "783d42a2-93b8-465f-a493-160cb6822465",
+          "callId": "2535f540-0ff0-464c-8b0c-caf345654122",
           "input": {
             "redacted": true,
-            "sha256": "33d2e502553482d65f334cc4cb7895e1ebbd26e1122171d6e54503d8cf96cf0a"
+            "sha256": "badf876e431775583a07395145566bacfe4a15a238d94e84e370bec7bc752411"
           },
           "quote": {
             "accepted": {
@@ -386,17 +398,17 @@
             },
             "x402Version": 2
           },
-          "nonce": "0xcca6068b2a8e01c0e724ed5586b1dba49ccde4cdd77db9c1a03e7b1e722fbcfe",
+          "nonce": "0x09294a88538567c015e236e542db1a0be72bb20b47b40e8ee5737538ebe0485c",
           "wire": {
             "body": {
               "redacted": true,
-              "sha256": "31bc263ba20ecd30c9379776c720f8632f1fd26789297187334421d073dbec71"
+              "sha256": "a2c958bd19e6f39a49deb1cd665aa5bd8178c70d3dfbdc68a9c650eb8ec41548"
             },
             "settlement": {
               "network": "eip155:31337",
-              "payer": "0xb28C7b0410766862EE76DBE6aD326a953208a405",
+              "payer": "0x00a09E4DEDDE5FA28e9117D52a1b7869fED421c4",
               "success": true,
-              "transaction": "0x0b0112edd9d789805472f4b6668508f685d8f51fa27d0150e0c463a0062df5fa"
+              "transaction": "0x700c2dacbd1ff3492bddef1a0ba33c56813a03e649e702b140778d282862a799"
             },
             "status": 200
           },
@@ -405,12 +417,12 @@
               "blockHash": "0xdb5c861fee65eed9911e54354c113904dc9912aeb410b275c96bce1ef01272eb",
               "blockNumber": "1",
               "confirmations": 2,
-              "transaction": "0x0b0112edd9d789805472f4b6668508f685d8f51fa27d0150e0c463a0062df5fa",
+              "transaction": "0x700c2dacbd1ff3492bddef1a0ba33c56813a03e649e702b140778d282862a799",
               "verification": "mock-settled"
             },
             "receipt": {
-              "requestId": "unsigned:0xcca6068b2a8e01c0e724ed5586b1dba49ccde4cdd77db9c1a03e7b1e722fbcfe",
-              "responseHash": "31bc263ba20ecd30c9379776c720f8632f1fd26789297187334421d073dbec71",
+              "requestId": "unsigned:0x09294a88538567c015e236e542db1a0be72bb20b47b40e8ee5737538ebe0485c",
+              "responseHash": "a2c958bd19e6f39a49deb1cd665aa5bd8178c70d3dfbdc68a9c650eb8ec41548",
               "signedAt": "2026-10-12T10:00:00.000Z",
               "signer": "none"
             },

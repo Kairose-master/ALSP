@@ -1,5 +1,5 @@
 {
-  "exampleVersion": "maha-json-post-lost-output-v1",
+  "exampleVersion": "maha-json-post-schema-observation-v2",
   "syntheticOnly": true,
   "baseCommit": "545221097a48cb6480c58b5d43e05f302acef30f",
   "contract": {
@@ -12,6 +12,8 @@
     },
     "requestSchemaUrl": "https://www.mahastrategies.com/context-pack-schema.json",
     "observedAt": "2026-10-12",
+    "reverifiedAt": "2026-10-13T03:48:22Z",
+    "outputSchemaPointer": "/contract/output/schema",
     "offerSnapshotSha256": "6fa66b72dcb04ca80e3a7db746cbb9b2a91cfeb4b8cb66b14a278f9c332a6988",
     "requestSchemaSnapshotSha256": "27251cdc111fbe92a748a8f328bdb133dbdbd931bf79d7295a9b62b00d097f6b",
     "maxRequestBytes": 450000,
@@ -25,6 +27,8 @@
   "actualNetwork": "eip155:31337",
   "publicPaymentMetadataUsedForExecution": false,
   "boundaries": [
+    "Request validation uses actual serialized fetch bytes; output validation uses observed response bytes and transport-received JSON against pinned official schemas.",
+    "Schema-valid unsigned output does not prove authenticity, factual correctness or economic value. Local inputDigest does not reproduce Maha inputHash.",
     "The real request contract is copied into an in-process synthetic provider. No Maha service, wallet, RPC, or facilitator is contacted.",
     "Cryptographic signatures verify only an ephemeral synthetic key on a mock chain/domain; all settlement evidence is mock-settled.",
     "Native VERIFIED/CLOSED is preserved and is not proof that a usable output was delivered.",
