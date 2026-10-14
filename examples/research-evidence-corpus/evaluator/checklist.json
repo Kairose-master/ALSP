@@ -1,0 +1,758 @@
+{
+  "fixture_id": "lantern-evidence-v1.1",
+  "access": "EVALUATOR ONLY: never provide this file, manifest, README, protocol, or control labels to selector or downstream model.",
+  "span_rule": "Each critical item is indivisible for this conservative fixture. Exact whole passage text plus correct source/version/passage attribution is required. Partial retention fails that item even if a human can recover part of its meaning.",
+  "items": [
+    {
+      "item_id": "N.D01.p01",
+      "critical": false,
+      "document_id": "D01",
+      "version": "1.0",
+      "source_sha256": "6eb631b8f2ee673385ada8405157704c9f4c3a15b91d994a3fe4cc1cf426f3be",
+      "passage_id": "D01.p01",
+      "line_start": 1,
+      "line_end": 1,
+      "byte_start": 0,
+      "byte_end": 165,
+      "quote": "The fictional Lantern archive pilot indexes scanned theatre programmes. This configuration applies only to pilot lane L; the production archive is outside its scope.",
+      "available_in": [
+        "run1",
+        "run2"
+      ],
+      "question_ids": [],
+      "rationale": "Context or editorial/logistical detail; not required to answer the frozen questions."
+    },
+    {
+      "item_id": "C01",
+      "critical": true,
+      "document_id": "D01",
+      "version": "1.0",
+      "source_sha256": "6eb631b8f2ee673385ada8405157704c9f4c3a15b91d994a3fe4cc1cf426f3be",
+      "passage_id": "D01.p02",
+      "line_start": 2,
+      "line_end": 2,
+      "byte_start": 166,
+      "byte_end": 292,
+      "quote": "For pilot lane L, the approved shard limit is 64 MiB as of 2026-04-01. MiB means 1,048,576 bytes; it does not mean decimal MB.",
+      "available_in": [
+        "run1",
+        "run2"
+      ],
+      "question_ids": [
+        "R1.Q1",
+        "R2.Q1"
+      ],
+      "rationale": "Earlier approved limit 64 MiB; MiB is 1,048,576 bytes, not MB."
+    },
+    {
+      "item_id": "C02",
+      "critical": true,
+      "document_id": "D01",
+      "version": "1.0",
+      "source_sha256": "6eb631b8f2ee673385ada8405157704c9f4c3a15b91d994a3fe4cc1cf426f3be",
+      "passage_id": "D01.p03",
+      "line_start": 3,
+      "line_end": 3,
+      "byte_start": 293,
+      "byte_end": 396,
+      "quote": "Dictionary compression is not enabled for pilot lane L. A smaller shard limit alone does not enable it.",
+      "available_in": [
+        "run1",
+        "run2"
+      ],
+      "question_ids": [
+        "R1.Q1",
+        "R2.Q3"
+      ],
+      "rationale": "Dictionary compression is not enabled; preserve negation."
+    },
+    {
+      "item_id": "N.D01.p04",
+      "critical": false,
+      "document_id": "D01",
+      "version": "1.0",
+      "source_sha256": "6eb631b8f2ee673385ada8405157704c9f4c3a15b91d994a3fe4cc1cf426f3be",
+      "passage_id": "D01.p04",
+      "line_start": 4,
+      "line_end": 4,
+      "byte_start": 397,
+      "byte_end": 577,
+      "quote": "The dashboard uses violet for queued work, amber for work in progress, and slate for completed work. These colours describe interface state only and are not QA approval indicators.",
+      "available_in": [
+        "run1",
+        "run2"
+      ],
+      "question_ids": [],
+      "rationale": "Context or editorial/logistical detail; not required to answer the frozen questions."
+    },
+    {
+      "item_id": "N.D01.p05",
+      "critical": false,
+      "document_id": "D01",
+      "version": "1.0",
+      "source_sha256": "6eb631b8f2ee673385ada8405157704c9f4c3a15b91d994a3fe4cc1cf426f3be",
+      "passage_id": "D01.p05",
+      "line_start": 5,
+      "line_end": 5,
+      "byte_start": 578,
+      "byte_end": 767,
+      "quote": "The meeting room display rotates through three sample programme covers. Their decorative sequence is alphabetic by show title and has no relationship to the order used by the indexing jobs.",
+      "available_in": [
+        "run1",
+        "run2"
+      ],
+      "question_ids": [],
+      "rationale": "Context or editorial/logistical detail; not required to answer the frozen questions."
+    },
+    {
+      "item_id": "N.D01.p06",
+      "critical": false,
+      "document_id": "D01",
+      "version": "1.0",
+      "source_sha256": "6eb631b8f2ee673385ada8405157704c9f4c3a15b91d994a3fe4cc1cf426f3be",
+      "passage_id": "D01.p06",
+      "line_start": 6,
+      "line_end": 6,
+      "byte_start": 768,
+      "byte_end": 951,
+      "quote": "The next documentation tidy-up will standardise section headings and rename the illustration folder. These editorial tasks do not change the pilot configuration or its review process.",
+      "available_in": [
+        "run1",
+        "run2"
+      ],
+      "question_ids": [],
+      "rationale": "Context or editorial/logistical detail; not required to answer the frozen questions."
+    },
+    {
+      "item_id": "N.D02.p01",
+      "critical": false,
+      "document_id": "D02",
+      "version": "1.0",
+      "source_sha256": "cc12fa4405c065ce42feb9507fbcbc41d4d979efc61c1951635f5f8fbc4be61d",
+      "passage_id": "D02.p01",
+      "line_start": 1,
+      "line_end": 1,
+      "byte_start": 0,
+      "byte_end": 190,
+      "quote": "This note records the first small QA exercise for pilot lane L. The sample contains theatre programme scans selected for a rehearsal of the review workflow, not a random archive-wide survey.",
+      "available_in": [
+        "run1",
+        "run2"
+      ],
+      "question_ids": [],
+      "rationale": "Context or editorial/logistical detail; not required to answer the frozen questions."
+    },
+    {
+      "item_id": "C03",
+      "critical": true,
+      "document_id": "D02",
+      "version": "1.0",
+      "source_sha256": "cc12fa4405c065ce42feb9507fbcbc41d4d979efc61c1951635f5f8fbc4be61d",
+      "passage_id": "D02.p02",
+      "line_start": 2,
+      "line_end": 2,
+      "byte_start": 191,
+      "byte_end": 360,
+      "quote": "Initial sample A17 had checksum mismatches in 2 of 20 files on 2026-04-02. This count describes those 20 files only; an archive-wide error rate has not been established.",
+      "available_in": [
+        "run1",
+        "run2"
+      ],
+      "question_ids": [
+        "R1.Q2",
+        "R2.Q2"
+      ],
+      "rationale": "Initial A17: 2 of 20 on 2026-04-02, not archive-wide."
+    },
+    {
+      "item_id": "C04",
+      "critical": true,
+      "document_id": "D02",
+      "version": "1.0",
+      "source_sha256": "cc12fa4405c065ce42feb9507fbcbc41d4d979efc61c1951635f5f8fbc4be61d",
+      "passage_id": "D02.p03",
+      "line_start": 3,
+      "line_end": 3,
+      "byte_start": 361,
+      "byte_end": 488,
+      "quote": "It is unresolved whether the checksum problem is fixed. Retest B42 is pending, and no pilot release approval has been recorded.",
+      "available_in": [
+        "run1",
+        "run2"
+      ],
+      "question_ids": [
+        "R1.Q2",
+        "R2.Q2"
+      ],
+      "rationale": "Fix unresolved; B42 pending at run 1; no recorded approval."
+    },
+    {
+      "item_id": "N.D02.p04",
+      "critical": false,
+      "document_id": "D02",
+      "version": "1.0",
+      "source_sha256": "cc12fa4405c065ce42feb9507fbcbc41d4d979efc61c1951635f5f8fbc4be61d",
+      "passage_id": "D02.p04",
+      "line_start": 4,
+      "line_end": 4,
+      "byte_start": 489,
+      "byte_end": 668,
+      "quote": "The review meeting also discussed making screenshot captions shorter. Caption wording is a documentation concern and will be handled after the QA review notes have been collected.",
+      "available_in": [
+        "run1",
+        "run2"
+      ],
+      "question_ids": [],
+      "rationale": "Context or editorial/logistical detail; not required to answer the frozen questions."
+    },
+    {
+      "item_id": "N.D02.p05",
+      "critical": false,
+      "document_id": "D02",
+      "version": "1.0",
+      "source_sha256": "cc12fa4405c065ce42feb9507fbcbc41d4d979efc61c1951635f5f8fbc4be61d",
+      "passage_id": "D02.p05",
+      "line_start": 5,
+      "line_end": 5,
+      "byte_start": 669,
+      "byte_end": 854,
+      "quote": "A spare review desk is available beside the catalogue shelves. Booking the desk is optional; reviewers may read the exported notes elsewhere without changing the recorded test evidence.",
+      "available_in": [
+        "run1",
+        "run2"
+      ],
+      "question_ids": [],
+      "rationale": "Context or editorial/logistical detail; not required to answer the frozen questions."
+    },
+    {
+      "item_id": "N.D02.p06",
+      "critical": false,
+      "document_id": "D02",
+      "version": "1.0",
+      "source_sha256": "cc12fa4405c065ce42feb9507fbcbc41d4d979efc61c1951635f5f8fbc4be61d",
+      "passage_id": "D02.p06",
+      "line_start": 6,
+      "line_end": 6,
+      "byte_start": 855,
+      "byte_end": 1036,
+      "quote": "The team prefers landscape printouts for comparison sheets. Printing a sheet is not an approval step, and the print queue is separate from the indexing queue shown on the dashboard.",
+      "available_in": [
+        "run1",
+        "run2"
+      ],
+      "question_ids": [],
+      "rationale": "Context or editorial/logistical detail; not required to answer the frozen questions."
+    },
+    {
+      "item_id": "N.D03.p01",
+      "critical": false,
+      "document_id": "D03",
+      "version": "1.0",
+      "source_sha256": "38baf02e16a80d5f4c413f20f309e71e389fcbfcecb6b8a1fb00fdc611eddc4c",
+      "passage_id": "D03.p01",
+      "line_start": 1,
+      "line_end": 1,
+      "byte_start": 0,
+      "byte_end": 186,
+      "quote": "This inventory lists support materials for the fictional Lantern pilot. It is provided to help readers identify the exact recovery package without inferring names from unrelated folders.",
+      "available_in": [
+        "run1",
+        "run2"
+      ],
+      "question_ids": [],
+      "rationale": "Context or editorial/logistical detail; not required to answer the frozen questions."
+    },
+    {
+      "item_id": "C05",
+      "critical": true,
+      "document_id": "D03",
+      "version": "1.0",
+      "source_sha256": "38baf02e16a80d5f4c413f20f309e71e389fcbfcecb6b8a1fb00fdc611eddc4c",
+      "passage_id": "D03.p02",
+      "line_start": 2,
+      "line_end": 2,
+      "byte_start": 187,
+      "byte_end": 315,
+      "quote": "The rollback package identifier for pilot lane L is lantern-revert-q7m4. No second rollback package is listed in this inventory.",
+      "available_in": [
+        "run1",
+        "run2"
+      ],
+      "question_ids": [
+        "R1.Q3",
+        "R2.Q4"
+      ],
+      "rationale": "Exact identifier lantern-revert-q7m4."
+    },
+    {
+      "item_id": "N.D03.p03",
+      "critical": false,
+      "document_id": "D03",
+      "version": "1.0",
+      "source_sha256": "38baf02e16a80d5f4c413f20f309e71e389fcbfcecb6b8a1fb00fdc611eddc4c",
+      "passage_id": "D03.p03",
+      "line_start": 3,
+      "line_end": 3,
+      "byte_start": 316,
+      "byte_end": 483,
+      "quote": "The inventory cover illustration is a line drawing of an old programme cabinet. The illustration is used in training slides and is not a diagram of the storage system.",
+      "available_in": [
+        "run1",
+        "run2"
+      ],
+      "question_ids": [],
+      "rationale": "Context or editorial/logistical detail; not required to answer the frozen questions."
+    },
+    {
+      "item_id": "N.D03.p04",
+      "critical": false,
+      "document_id": "D03",
+      "version": "1.0",
+      "source_sha256": "38baf02e16a80d5f4c413f20f309e71e389fcbfcecb6b8a1fb00fdc611eddc4c",
+      "passage_id": "D03.p04",
+      "line_start": 4,
+      "line_end": 4,
+      "byte_start": 484,
+      "byte_end": 672,
+      "quote": "Spare stationery is kept in the cabinet marked rehearsal supplies. Its drawers contain index cards, removable tabs, and blank labels for reviewers who prefer to make temporary paper notes.",
+      "available_in": [
+        "run1",
+        "run2"
+      ],
+      "question_ids": [],
+      "rationale": "Context or editorial/logistical detail; not required to answer the frozen questions."
+    },
+    {
+      "item_id": "N.D03.p05",
+      "critical": false,
+      "document_id": "D03",
+      "version": "1.0",
+      "source_sha256": "38baf02e16a80d5f4c413f20f309e71e389fcbfcecb6b8a1fb00fdc611eddc4c",
+      "passage_id": "D03.p05",
+      "line_start": 5,
+      "line_end": 5,
+      "byte_start": 673,
+      "byte_end": 871,
+      "quote": "The draft training agenda has three sections: opening the catalogue view, reading review notes, and locating support materials. Attendance records are maintained separately from the pilot QA record.",
+      "available_in": [
+        "run1",
+        "run2"
+      ],
+      "question_ids": [],
+      "rationale": "Context or editorial/logistical detail; not required to answer the frozen questions."
+    },
+    {
+      "item_id": "N.D03.p06",
+      "critical": false,
+      "document_id": "D03",
+      "version": "1.0",
+      "source_sha256": "38baf02e16a80d5f4c413f20f309e71e389fcbfcecb6b8a1fb00fdc611eddc4c",
+      "passage_id": "D03.p06",
+      "line_start": 6,
+      "line_end": 6,
+      "byte_start": 872,
+      "byte_end": 1053,
+      "quote": "A future editorial pass may replace the cover illustration with a photograph. This proposal has no scheduled date, and choosing an image will not change any listed software package.",
+      "available_in": [
+        "run1",
+        "run2"
+      ],
+      "question_ids": [],
+      "rationale": "Context or editorial/logistical detail; not required to answer the frozen questions."
+    },
+    {
+      "item_id": "N.D04.p01",
+      "critical": false,
+      "document_id": "D04",
+      "version": "2.0",
+      "source_sha256": "508bd9c91c6a3d18af6029158cd669d31f263356433a478ec37d9c56d54b25f8",
+      "passage_id": "D04.p01",
+      "line_start": 1,
+      "line_end": 1,
+      "byte_start": 0,
+      "byte_end": 178,
+      "quote": "This amendment records a configuration decision for the fictional Lantern pilot. Its version refers to the configuration document, not to the QA reports or the support inventory.",
+      "available_in": [
+        "run2"
+      ],
+      "question_ids": [],
+      "rationale": "Context or editorial/logistical detail; not required to answer the frozen questions."
+    },
+    {
+      "item_id": "C06",
+      "critical": true,
+      "document_id": "D04",
+      "version": "2.0",
+      "source_sha256": "508bd9c91c6a3d18af6029158cd669d31f263356433a478ec37d9c56d54b25f8",
+      "passage_id": "D04.p02",
+      "line_start": 2,
+      "line_end": 2,
+      "byte_start": 179,
+      "byte_end": 360,
+      "quote": "Effective 2026-04-05T12:00:00Z, the approved shard limit for pilot lane L is 48 MiB. This explicitly supersedes the 64 MiB limit in D01 version 1.0; MiB still means 1,048,576 bytes.",
+      "available_in": [
+        "run2"
+      ],
+      "question_ids": [
+        "R2.Q1"
+      ],
+      "rationale": "48 MiB effective 2026-04-05T12:00:00Z explicitly supersedes earlier 64 MiB, unit unchanged."
+    },
+    {
+      "item_id": "C07",
+      "critical": true,
+      "document_id": "D04",
+      "version": "2.0",
+      "source_sha256": "508bd9c91c6a3d18af6029158cd669d31f263356433a478ec37d9c56d54b25f8",
+      "passage_id": "D04.p03",
+      "line_start": 3,
+      "line_end": 3,
+      "byte_start": 361,
+      "byte_end": 442,
+      "quote": "Dictionary compression remains not enabled for pilot lane L after this amendment.",
+      "available_in": [
+        "run2"
+      ],
+      "question_ids": [
+        "R2.Q3"
+      ],
+      "rationale": "Dictionary compression remains not enabled."
+    },
+    {
+      "item_id": "C08",
+      "critical": true,
+      "document_id": "D04",
+      "version": "2.0",
+      "source_sha256": "508bd9c91c6a3d18af6029158cd669d31f263356433a478ec37d9c56d54b25f8",
+      "passage_id": "D04.p04",
+      "line_start": 4,
+      "line_end": 4,
+      "byte_start": 443,
+      "byte_end": 597,
+      "quote": "This amendment records the approved limit, not a deployment observation. It does not establish which limit is currently deployed or approve pilot release.",
+      "available_in": [
+        "run2"
+      ],
+      "question_ids": [
+        "R2.Q1",
+        "R2.Q2"
+      ],
+      "rationale": "Approved limit is not proof of deployment or release approval."
+    },
+    {
+      "item_id": "N.D04.p05",
+      "critical": false,
+      "document_id": "D04",
+      "version": "2.0",
+      "source_sha256": "508bd9c91c6a3d18af6029158cd669d31f263356433a478ec37d9c56d54b25f8",
+      "passage_id": "D04.p05",
+      "line_start": 5,
+      "line_end": 5,
+      "byte_start": 598,
+      "byte_end": 785,
+      "quote": "The revised configuration sheet will keep the existing dashboard colours so that screenshots remain recognisable. The illustrations will be moved to an appendix in a later editorial pass.",
+      "available_in": [
+        "run2"
+      ],
+      "question_ids": [],
+      "rationale": "Context or editorial/logistical detail; not required to answer the frozen questions."
+    },
+    {
+      "item_id": "N.D04.p06",
+      "critical": false,
+      "document_id": "D04",
+      "version": "2.0",
+      "source_sha256": "508bd9c91c6a3d18af6029158cd669d31f263356433a478ec37d9c56d54b25f8",
+      "passage_id": "D04.p06",
+      "line_start": 6,
+      "line_end": 6,
+      "byte_start": 786,
+      "byte_end": 981,
+      "quote": "The change discussion was held in the same review room used for the earlier pilot notes. Seating arrangements and display settings were unchanged, and no new training attendance list was created.",
+      "available_in": [
+        "run2"
+      ],
+      "question_ids": [],
+      "rationale": "Context or editorial/logistical detail; not required to answer the frozen questions."
+    },
+    {
+      "item_id": "N.D05.p01",
+      "critical": false,
+      "document_id": "D05",
+      "version": "1.0",
+      "source_sha256": "8dc0ab7addffc2a1b91806ba00467c87ae0e95aaa048e453ffb8c379ec7539e8",
+      "passage_id": "D05.p01",
+      "line_start": 1,
+      "line_end": 1,
+      "byte_start": 0,
+      "byte_end": 177,
+      "quote": "This report concerns retest B42 of pilot lane L. It is a QA observation report and does not amend configuration documents or confer authority over another QA observation report.",
+      "available_in": [
+        "run2"
+      ],
+      "question_ids": [],
+      "rationale": "Context or editorial/logistical detail; not required to answer the frozen questions."
+    },
+    {
+      "item_id": "C09",
+      "critical": true,
+      "document_id": "D05",
+      "version": "1.0",
+      "source_sha256": "8dc0ab7addffc2a1b91806ba00467c87ae0e95aaa048e453ffb8c379ec7539e8",
+      "passage_id": "D05.p02",
+      "line_start": 2,
+      "line_end": 2,
+      "byte_start": 178,
+      "byte_end": 298,
+      "quote": "For retest B42, snapshot s42 at 2026-04-06T08:00:00Z, this report records checksum mismatches in 0 of the same 20 files.",
+      "available_in": [
+        "run2"
+      ],
+      "question_ids": [
+        "R2.Q2"
+      ],
+      "rationale": "Retest B42/s42 at 2026-04-06T08:00:00Z: report says 0 of same 20."
+    },
+    {
+      "item_id": "C10",
+      "critical": true,
+      "document_id": "D05",
+      "version": "1.0",
+      "source_sha256": "8dc0ab7addffc2a1b91806ba00467c87ae0e95aaa048e453ffb8c379ec7539e8",
+      "passage_id": "D05.p03",
+      "line_start": 3,
+      "line_end": 3,
+      "byte_start": 299,
+      "byte_end": 445,
+      "quote": "The result is preliminary. A sample of 20 files does not establish that the archive is error-free, and this report does not approve pilot release.",
+      "available_in": [
+        "run2"
+      ],
+      "question_ids": [
+        "R2.Q2"
+      ],
+      "rationale": "Preliminary, small sample, not error-free archive or release approval."
+    },
+    {
+      "item_id": "N.D05.p04",
+      "critical": false,
+      "document_id": "D05",
+      "version": "1.0",
+      "source_sha256": "8dc0ab7addffc2a1b91806ba00467c87ae0e95aaa048e453ffb8c379ec7539e8",
+      "passage_id": "D05.p04",
+      "line_start": 4,
+      "line_end": 4,
+      "byte_start": 446,
+      "byte_end": 610,
+      "quote": "The printed comparison sheet has a wider left margin than the first QA note. The wider margin leaves room for comments and does not encode pass or fail information.",
+      "available_in": [
+        "run2"
+      ],
+      "question_ids": [],
+      "rationale": "Context or editorial/logistical detail; not required to answer the frozen questions."
+    },
+    {
+      "item_id": "N.D05.p05",
+      "critical": false,
+      "document_id": "D05",
+      "version": "1.0",
+      "source_sha256": "8dc0ab7addffc2a1b91806ba00467c87ae0e95aaa048e453ffb8c379ec7539e8",
+      "passage_id": "D05.p05",
+      "line_start": 5,
+      "line_end": 5,
+      "byte_start": 611,
+      "byte_end": 803,
+      "quote": "The meeting facilitator collected questions about page rotation and thumbnail size. Those questions were assigned to a later interface discussion, with no configuration decision recorded here.",
+      "available_in": [
+        "run2"
+      ],
+      "question_ids": [],
+      "rationale": "Context or editorial/logistical detail; not required to answer the frozen questions."
+    },
+    {
+      "item_id": "N.D05.p06",
+      "critical": false,
+      "document_id": "D05",
+      "version": "1.0",
+      "source_sha256": "8dc0ab7addffc2a1b91806ba00467c87ae0e95aaa048e453ffb8c379ec7539e8",
+      "passage_id": "D05.p06",
+      "line_start": 6,
+      "line_end": 6,
+      "byte_start": 804,
+      "byte_end": 993,
+      "quote": "The report was placed in the review folder alongside a blank annotation sheet. The blank sheet can be reused for future discussions and contains no additional observations about retest B42.",
+      "available_in": [
+        "run2"
+      ],
+      "question_ids": [],
+      "rationale": "Context or editorial/logistical detail; not required to answer the frozen questions."
+    },
+    {
+      "item_id": "N.D06.p01",
+      "critical": false,
+      "document_id": "D06",
+      "version": "1.0",
+      "source_sha256": "3db3ca53b6cc4af36b648e709c4d9e790f6972b76242595d4a61de7b2cd5500e",
+      "passage_id": "D06.p01",
+      "line_start": 1,
+      "line_end": 1,
+      "byte_start": 0,
+      "byte_end": 188,
+      "quote": "This independently written QA note concerns the same retest B42 and the same snapshot as D05. Its later publication time is a record of when the note was written, not an authority ranking.",
+      "available_in": [
+        "run2"
+      ],
+      "question_ids": [],
+      "rationale": "Context or editorial/logistical detail; not required to answer the frozen questions."
+    },
+    {
+      "item_id": "C11",
+      "critical": true,
+      "document_id": "D06",
+      "version": "1.0",
+      "source_sha256": "3db3ca53b6cc4af36b648e709c4d9e790f6972b76242595d4a61de7b2cd5500e",
+      "passage_id": "D06.p02",
+      "line_start": 2,
+      "line_end": 2,
+      "byte_start": 189,
+      "byte_end": 307,
+      "quote": "For retest B42, snapshot s42 at 2026-04-06T08:00:00Z, this note records checksum mismatches in 1 of the same 20 files.",
+      "available_in": [
+        "run2"
+      ],
+      "question_ids": [
+        "R2.Q2"
+      ],
+      "rationale": "Same B42/s42/time/20 files: conflicting note says 1 mismatch."
+    },
+    {
+      "item_id": "C12",
+      "critical": true,
+      "document_id": "D06",
+      "version": "1.0",
+      "source_sha256": "3db3ca53b6cc4af36b648e709c4d9e790f6972b76242595d4a61de7b2cd5500e",
+      "passage_id": "D06.p03",
+      "line_start": 3,
+      "line_end": 3,
+      "byte_start": 308,
+      "byte_end": 441,
+      "quote": "This note does not supersede D05. No reconciled mismatch count or pilot release approval is recorded; the disagreement is unresolved.",
+      "available_in": [
+        "run2"
+      ],
+      "question_ids": [
+        "R2.Q2"
+      ],
+      "rationale": "No supersession, no reconciled count or recorded approval, unresolved disagreement."
+    },
+    {
+      "item_id": "N.D06.p04",
+      "critical": false,
+      "document_id": "D06",
+      "version": "1.0",
+      "source_sha256": "3db3ca53b6cc4af36b648e709c4d9e790f6972b76242595d4a61de7b2cd5500e",
+      "passage_id": "D06.p04",
+      "line_start": 4,
+      "line_end": 4,
+      "byte_start": 442,
+      "byte_end": 635,
+      "quote": "The annotation sheet used a narrow right margin and a plain title. These formatting choices were made for readability and do not distinguish this note as approved, final, or more authoritative.",
+      "available_in": [
+        "run2"
+      ],
+      "question_ids": [],
+      "rationale": "Context or editorial/logistical detail; not required to answer the frozen questions."
+    },
+    {
+      "item_id": "N.D06.p05",
+      "critical": false,
+      "document_id": "D06",
+      "version": "1.0",
+      "source_sha256": "3db3ca53b6cc4af36b648e709c4d9e790f6972b76242595d4a61de7b2cd5500e",
+      "passage_id": "D06.p05",
+      "line_start": 5,
+      "line_end": 5,
+      "byte_start": 636,
+      "byte_end": 821,
+      "quote": "The review folder also contains an agenda for the next editorial meeting. That meeting is intended to address headings and illustration placement rather than adjudicate QA observations.",
+      "available_in": [
+        "run2"
+      ],
+      "question_ids": [],
+      "rationale": "Context or editorial/logistical detail; not required to answer the frozen questions."
+    },
+    {
+      "item_id": "N.D06.p06",
+      "critical": false,
+      "document_id": "D06",
+      "version": "1.0",
+      "source_sha256": "3db3ca53b6cc4af36b648e709c4d9e790f6972b76242595d4a61de7b2cd5500e",
+      "passage_id": "D06.p06",
+      "line_start": 6,
+      "line_end": 6,
+      "byte_start": 822,
+      "byte_end": 1013,
+      "quote": "The catalogue demonstration remains available for training with its usual sample covers. A demonstration being available is not evidence of a completed deployment or a pilot release decision.",
+      "available_in": [
+        "run2"
+      ],
+      "question_ids": [],
+      "rationale": "Context or editorial/logistical detail; not required to answer the frozen questions."
+    }
+  ],
+  "answer_rubric": {
+    "R1.Q1": {
+      "critical_items": [
+        "C01",
+        "C02"
+      ],
+      "required": "64 MiB with 1,048,576-byte unit; dictionary compression not enabled."
+    },
+    "R1.Q2": {
+      "critical_items": [
+        "C03",
+        "C04"
+      ],
+      "required": "A17 on 2026-04-02: 2/20 files, sample only; fix unresolved, retest pending, no approval recorded."
+    },
+    "R1.Q3": {
+      "critical_items": [
+        "C05"
+      ],
+      "required": "lantern-revert-q7m4, exact spelling."
+    },
+    "R2.Q1": {
+      "critical_items": [
+        "C01",
+        "C06",
+        "C08"
+      ],
+      "required": "Earlier 64 MiB replaced by approved 48 MiB effective 2026-04-05T12:00:00Z; same MiB units, deployment not established."
+    },
+    "R2.Q2": {
+      "critical_items": [
+        "C03",
+        "C04",
+        "C08",
+        "C09",
+        "C10",
+        "C11",
+        "C12"
+      ],
+      "required": "Contrast initial A17 2/20 on 2026-04-02 with B42/s42 same 20 at 2026-04-06T08:00:00Z reported as 0/20 by D05 and 1/20 by D06; preliminary sample cannot establish archive-wide state; no supersession, no reconciled count, fix remains unresolved and release approval is not established. Never choose the later note as automatically correct."
+    },
+    "R2.Q3": {
+      "critical_items": [
+        "C02",
+        "C07"
+      ],
+      "required": "No; dictionary compression remains not enabled."
+    },
+    "R2.Q4": {
+      "critical_items": [
+        "C05"
+      ],
+      "required": "lantern-revert-q7m4, exact spelling; except omission control requires insufficient evidence."
+    }
+  }
+}

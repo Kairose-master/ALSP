@@ -1,0 +1,129 @@
+{
+  "fixture_id": "lantern-evidence-v1.1",
+  "execution_status": "DESIGN_ONLY_NOT_EXECUTED",
+  "freeze": {
+    "stage": "Corpus, questions, checklist, byte caps, controls, and acceptance are fixed before any candidate selection.",
+    "changes": "Any corpus, task, criticality, budget, rubric, or control change creates a new fixture ID and manifest. Never change these after inspecting candidate output.",
+    "launch_gate": "Before any candidate selection, create and hash a separate execution-lock.json with concrete provider/adapter/version/request parameters, model snapshot and tokenizer details. This design does not authorize a paid call."
+  },
+  "selector_prompt": "Select verbatim passages from the supplied evidence needed to answer all of the supplied questions. Keep exact source, version, and passage references. Preserve relevant qualifiers and context. Do not answer the questions, resolve disagreements, or invent omitted text.",
+  "input_allowlist": {
+    "selector": [
+      "selector_prompt scalar extracted from evaluator/protocol.json; never the evaluator file or any other evaluator field",
+      "current run as_of and question texts from tasks.json",
+      "condition-specific source passages with canonical references",
+      "frozen evidence byte cap and separately locked provider request parameters"
+    ],
+    "downstream": [
+      "tasks.json system_prompt",
+      "current run as_of and question texts",
+      "condition-specific evidence text only"
+    ],
+    "forbidden": [
+      "evaluator files and fields, except the explicitly allowlisted selector_prompt scalar extracted for the selector instruction",
+      "README.md",
+      "PROTOCOL.md",
+      "manifest.json",
+      "tools/*",
+      "answer keys",
+      "condition labels",
+      "other-condition or other-run outputs, except the exact saved S.run1 selected evidence prescribed for C.run2; never prior downstream answers",
+      "external retrieval and browsing"
+    ]
+  },
+  "conditions": [
+    {
+      "id": "F",
+      "label": "Full context",
+      "run1": "All D01-D03 passages, chronological document order then passage order.",
+      "run2": "All D01-D06 passages, freshly supplied by caller; no prior answer or hidden session state."
+    },
+    {
+      "id": "S",
+      "label": "Snapshot selection",
+      "run1": "Candidate selects from all D01-D03 using run1 questions; exact output saved and hashed.",
+      "run2": "Candidate selects from all D01-D06 using run2 questions, freshly supplied by caller."
+    },
+    {
+      "id": "C",
+      "label": "Caller-managed carryforward",
+      "run1": "Shares exactly S run1 evidence; do not rerun selection or invent memory.",
+      "run2": "Candidate sees only the saved S run1 evidence plus all D04-D06, with run2 questions. Old omitted passages are unavailable. Output must retain original source/version references. No prior model answer is supplied."
+    },
+    {
+      "id": "O",
+      "label": "Hand-constructed omission control",
+      "run1": "No separate call.",
+      "run2": "F run2 minus D03.p02 only; fresh downstream call with identical questions and system prompt. Not provider-produced, and not part of a compression comparison."
+    }
+  ],
+  "budgets": {
+    "unit": "UTF-8 bytes, a deterministic size proxy, not model tokens",
+    "selected_evidence_utf8_bytes": {
+      "run1": 2100,
+      "run2": 4200
+    },
+    "scope": "Canonical evidence including all reference lines, timestamps, separators and trailing newlines. Excludes fixed system prompt and questions; report their size separately.",
+    "full_context": "F and O are reference/control conditions, exempt from selection caps. The downstream context window must fit full F, fixed prompts and output allowance without truncation.",
+    "candidate_handling": "No silent truncation, post-hoc passage substitution or retries based on checklist scores. Over-budget or unmappable output is an invalid candidate and separately reported as such.",
+    "normalization": "Map genuine extractive output back to exact original text/spans. Whole-passage output uses render_passage in tools/fixture.py; partial spans must retain original UTF-8 byte offsets in a preregistered adapter format, count every reference byte, and cannot receive whole-item credit for partial text. No expansion with omitted source text."
+  },
+  "carryforward_control": "Caller storage/replay only. No service persistence is presumed or tested. F versus S measures snapshot selection. S versus C at run2 measures the effect of caller-managed carryforward under the same current-run output cap; diagnose propagated omissions from the saved spans. The changed selector input composition can also change selection even when S1 retained all critical evidence, so this comparison does not isolate omission alone. C failure cannot alone be attributed to the service losing persistent memory.",
+  "evidence_scoring": {
+    "unit": "One checklist item; binary retained/not retained",
+    "critical_pass": "All critical items available for that run must survive with their entire exact span and correct source/version attribution. Any critical loss fails this fixture-condition-run irrespective of average retention or size reduction. Run2 C uses the same gold checklist as F and S, even if a critical item was lost at run1.",
+    "critical_total": {
+      "run1": 5,
+      "run2": 12
+    },
+    "noncritical": "Report retained count over available noncritical items separately: run1 13, run2 24. Do not penalise removal of noncritical items or let them compensate for critical loss.",
+    "attribution": "Wrong source/version or fabricated quotation fails the affected critical item and the provenance gate. Repeated spans count once for retention but every byte counts against budget.",
+    "omission_expected": "O deliberately fails C05 retention. Its downstream answer must acknowledge insufficient evidence for R2.Q4; report it separately."
+  },
+  "answer_scoring": {
+    "separate_from_evidence": true,
+    "per_question": {
+      "completeness": "All required claims in evaluator/checklist.json, judged against full corpus for F/S/C. O changes only R2.Q4 to insufficient evidence.",
+      "grounding": "Every factual claim has a valid supplied source/version/passage reference that entails it; no invented or absent-source claim.",
+      "calibration": "Preserve uncertainty, scope, units and negation; distinguish explicit supersession from unresolved conflict; abstain when necessary."
+    },
+    "question_pass": "All three dimensions true. Report per-question and per-dimension outcomes, not just averages.",
+    "fixture_answer_pass": "All questions pass for that run. A grounded abstention after candidate-caused loss gets grounding/calibration credit but fails completeness for an originally answerable question. Do not let correct guessing repair a retention failure.",
+    "composite": "Report evidence gate and answer gate separately. An overall F/S/C fixture pass requires both, plus valid budget/provenance/configuration; size savings alone are never success. O is a separate calibration control."
+  },
+  "downstream_configuration": {
+    "model_snapshot": null,
+    "provider": null,
+    "temperature": null,
+    "sampling_seed_policy": null,
+    "max_output_tokens": null,
+    "tools": "disabled",
+    "sessions": "fresh for each downstream call; no cross-condition or previous-run chat history",
+    "same_configuration": "All F/S/C/O downstream calls use exactly the same locked model snapshot, system prompt, decoding parameters and output cap. Only run questions and evidence differ as specified. C shares S run1 instead of duplicate calls.",
+    "status": "PENDING_EXECUTION_LOCK; no model was selected by the user or invoked for this fixture"
+  },
+  "token_measurement": {
+    "status": "PENDING_TARGET_LOCK",
+    "intended_tokenizer": null,
+    "tokenizer_version": null,
+    "vocabulary_hash": null,
+    "encoding_options": null,
+    "token_budget": null,
+    "rule": "Declare the intended downstream tokenizer, exact implementation/version/vocabulary hash, encoding options and any token budget in execution-lock.json before selection. If unavailable, leave token metrics unreported. UTF-8 bytes are not tokens; a compiler or service-reported savings value is an estimate unless reproduced with this declared tokenizer.",
+    "accounting": "Report source-evidence tokens and full downstream prompt tokens separately. Report selector input/output tokens and two-run total separately so replay cost is not hidden. Use each run full F as the evidence savings denominator; report zero/negative savings honestly."
+  },
+  "randomization_and_blinding": {
+    "blocks": 5,
+    "schedule_rule": "Within each block, sort eligible selector jobs by SHA256(\"lantern-evidence-v1.1|selector|<block>|<job>\"). S1 must precede C2; among currently eligible jobs choose the smallest hash. For downstream calls, sort by SHA256(\"lantern-evidence-v1.1|answer|<block>|<condition>.<run>\"). Blocks are integers 1 through 5. O exists only at run2; C run1 reuses S run1.",
+    "stochasticity": "Lock provider retry/seed support and downstream seeds before selection. If seeds are unsupported, record that explicitly and execute five independent blocks without cherry-picking. No score-driven retries.",
+    "blinding": "A coordinator assigns opaque IDs before judging. Two scorers independently see only the question, candidate answer, supplied evidence, and evaluator rubric. They do not see condition/provider labels, byte/token savings, or other answers. They adjudicate disagreements before labels are revealed. Evidence-retention scoring is performed separately. Context length can still partially reveal condition, so blinding is limited.",
+    "reporting": "Show every preregistered block and invalid/missing call, per-question outcomes, paired condition differences, and exact artifacts. This small shared corpus does not support broad significance, generalization, or perfect-retention claims."
+  },
+  "results": {
+    "provider_selection": null,
+    "downstream_answers": null,
+    "token_savings": null,
+    "evidence_scores": null,
+    "answer_scores": null
+  }
+}

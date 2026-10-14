@@ -1,0 +1,321 @@
+{
+  "fixture_id": "lantern-evidence-v1.1",
+  "synthetic": true,
+  "encoding": "UTF-8",
+  "newline": "LF",
+  "span_convention": "1-based inclusive line ranges; 0-based half-open UTF-8 byte offsets, excluding trailing LF",
+  "documents": [
+    {
+      "document_id": "D01",
+      "version": "1.0",
+      "published_at": "2026-04-01T09:00:00Z",
+      "title": "Initial pilot configuration",
+      "path": "sources/D01.txt",
+      "sha256": "6eb631b8f2ee673385ada8405157704c9f4c3a15b91d994a3fe4cc1cf426f3be",
+      "passages": [
+        {
+          "passage_id": "D01.p01",
+          "line_start": 1,
+          "line_end": 1,
+          "byte_start": 0,
+          "byte_end": 165
+        },
+        {
+          "passage_id": "D01.p02",
+          "line_start": 2,
+          "line_end": 2,
+          "byte_start": 166,
+          "byte_end": 292
+        },
+        {
+          "passage_id": "D01.p03",
+          "line_start": 3,
+          "line_end": 3,
+          "byte_start": 293,
+          "byte_end": 396
+        },
+        {
+          "passage_id": "D01.p04",
+          "line_start": 4,
+          "line_end": 4,
+          "byte_start": 397,
+          "byte_end": 577
+        },
+        {
+          "passage_id": "D01.p05",
+          "line_start": 5,
+          "line_end": 5,
+          "byte_start": 578,
+          "byte_end": 767
+        },
+        {
+          "passage_id": "D01.p06",
+          "line_start": 6,
+          "line_end": 6,
+          "byte_start": 768,
+          "byte_end": 951
+        }
+      ]
+    },
+    {
+      "document_id": "D02",
+      "version": "1.0",
+      "published_at": "2026-04-02T15:00:00Z",
+      "title": "Initial QA note",
+      "path": "sources/D02.txt",
+      "sha256": "cc12fa4405c065ce42feb9507fbcbc41d4d979efc61c1951635f5f8fbc4be61d",
+      "passages": [
+        {
+          "passage_id": "D02.p01",
+          "line_start": 1,
+          "line_end": 1,
+          "byte_start": 0,
+          "byte_end": 190
+        },
+        {
+          "passage_id": "D02.p02",
+          "line_start": 2,
+          "line_end": 2,
+          "byte_start": 191,
+          "byte_end": 360
+        },
+        {
+          "passage_id": "D02.p03",
+          "line_start": 3,
+          "line_end": 3,
+          "byte_start": 361,
+          "byte_end": 488
+        },
+        {
+          "passage_id": "D02.p04",
+          "line_start": 4,
+          "line_end": 4,
+          "byte_start": 489,
+          "byte_end": 668
+        },
+        {
+          "passage_id": "D02.p05",
+          "line_start": 5,
+          "line_end": 5,
+          "byte_start": 669,
+          "byte_end": 854
+        },
+        {
+          "passage_id": "D02.p06",
+          "line_start": 6,
+          "line_end": 6,
+          "byte_start": 855,
+          "byte_end": 1036
+        }
+      ]
+    },
+    {
+      "document_id": "D03",
+      "version": "1.0",
+      "published_at": "2026-04-02T16:00:00Z",
+      "title": "Pilot support inventory",
+      "path": "sources/D03.txt",
+      "sha256": "38baf02e16a80d5f4c413f20f309e71e389fcbfcecb6b8a1fb00fdc611eddc4c",
+      "passages": [
+        {
+          "passage_id": "D03.p01",
+          "line_start": 1,
+          "line_end": 1,
+          "byte_start": 0,
+          "byte_end": 186
+        },
+        {
+          "passage_id": "D03.p02",
+          "line_start": 2,
+          "line_end": 2,
+          "byte_start": 187,
+          "byte_end": 315
+        },
+        {
+          "passage_id": "D03.p03",
+          "line_start": 3,
+          "line_end": 3,
+          "byte_start": 316,
+          "byte_end": 483
+        },
+        {
+          "passage_id": "D03.p04",
+          "line_start": 4,
+          "line_end": 4,
+          "byte_start": 484,
+          "byte_end": 672
+        },
+        {
+          "passage_id": "D03.p05",
+          "line_start": 5,
+          "line_end": 5,
+          "byte_start": 673,
+          "byte_end": 871
+        },
+        {
+          "passage_id": "D03.p06",
+          "line_start": 6,
+          "line_end": 6,
+          "byte_start": 872,
+          "byte_end": 1053
+        }
+      ]
+    },
+    {
+      "document_id": "D04",
+      "version": "2.0",
+      "published_at": "2026-04-05T10:00:00Z",
+      "title": "Configuration amendment",
+      "path": "sources/D04.txt",
+      "sha256": "508bd9c91c6a3d18af6029158cd669d31f263356433a478ec37d9c56d54b25f8",
+      "passages": [
+        {
+          "passage_id": "D04.p01",
+          "line_start": 1,
+          "line_end": 1,
+          "byte_start": 0,
+          "byte_end": 178
+        },
+        {
+          "passage_id": "D04.p02",
+          "line_start": 2,
+          "line_end": 2,
+          "byte_start": 179,
+          "byte_end": 360
+        },
+        {
+          "passage_id": "D04.p03",
+          "line_start": 3,
+          "line_end": 3,
+          "byte_start": 361,
+          "byte_end": 442
+        },
+        {
+          "passage_id": "D04.p04",
+          "line_start": 4,
+          "line_end": 4,
+          "byte_start": 443,
+          "byte_end": 597
+        },
+        {
+          "passage_id": "D04.p05",
+          "line_start": 5,
+          "line_end": 5,
+          "byte_start": 598,
+          "byte_end": 785
+        },
+        {
+          "passage_id": "D04.p06",
+          "line_start": 6,
+          "line_end": 6,
+          "byte_start": 786,
+          "byte_end": 981
+        }
+      ]
+    },
+    {
+      "document_id": "D05",
+      "version": "1.0",
+      "published_at": "2026-04-06T09:00:00Z",
+      "title": "QA retest report",
+      "path": "sources/D05.txt",
+      "sha256": "8dc0ab7addffc2a1b91806ba00467c87ae0e95aaa048e453ffb8c379ec7539e8",
+      "passages": [
+        {
+          "passage_id": "D05.p01",
+          "line_start": 1,
+          "line_end": 1,
+          "byte_start": 0,
+          "byte_end": 177
+        },
+        {
+          "passage_id": "D05.p02",
+          "line_start": 2,
+          "line_end": 2,
+          "byte_start": 178,
+          "byte_end": 298
+        },
+        {
+          "passage_id": "D05.p03",
+          "line_start": 3,
+          "line_end": 3,
+          "byte_start": 299,
+          "byte_end": 445
+        },
+        {
+          "passage_id": "D05.p04",
+          "line_start": 4,
+          "line_end": 4,
+          "byte_start": 446,
+          "byte_end": 610
+        },
+        {
+          "passage_id": "D05.p05",
+          "line_start": 5,
+          "line_end": 5,
+          "byte_start": 611,
+          "byte_end": 803
+        },
+        {
+          "passage_id": "D05.p06",
+          "line_start": 6,
+          "line_end": 6,
+          "byte_start": 804,
+          "byte_end": 993
+        }
+      ]
+    },
+    {
+      "document_id": "D06",
+      "version": "1.0",
+      "published_at": "2026-04-06T11:00:00Z",
+      "title": "Independent QA retest note",
+      "path": "sources/D06.txt",
+      "sha256": "3db3ca53b6cc4af36b648e709c4d9e790f6972b76242595d4a61de7b2cd5500e",
+      "passages": [
+        {
+          "passage_id": "D06.p01",
+          "line_start": 1,
+          "line_end": 1,
+          "byte_start": 0,
+          "byte_end": 188
+        },
+        {
+          "passage_id": "D06.p02",
+          "line_start": 2,
+          "line_end": 2,
+          "byte_start": 189,
+          "byte_end": 307
+        },
+        {
+          "passage_id": "D06.p03",
+          "line_start": 3,
+          "line_end": 3,
+          "byte_start": 308,
+          "byte_end": 441
+        },
+        {
+          "passage_id": "D06.p04",
+          "line_start": 4,
+          "line_end": 4,
+          "byte_start": 442,
+          "byte_end": 635
+        },
+        {
+          "passage_id": "D06.p05",
+          "line_start": 5,
+          "line_end": 5,
+          "byte_start": 636,
+          "byte_end": 821
+        },
+        {
+          "passage_id": "D06.p06",
+          "line_start": 6,
+          "line_end": 6,
+          "byte_start": 822,
+          "byte_end": 1013
+        }
+      ]
+    }
+  ]
+}

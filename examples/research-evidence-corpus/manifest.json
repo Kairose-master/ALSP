@@ -1,0 +1,71 @@
+{
+  "fixture_id": "lantern-evidence-v1.1",
+  "created_utc": "2026-10-14",
+  "status": "DESIGN_ONLY_NOT_EXECUTED",
+  "repository_base": "4b35509f668c4b795ae411632b05493dea1bee89",
+  "integrity_scope": "All files except manifest.json; SHA-256 over exact bytes",
+  "selection_started": false,
+  "files": {
+    "PROTOCOL.md": {
+      "sha256": "b233cd2c0427a83822812b32f291878710af973882f74b8ca35c324f25cde61e",
+      "bytes": 11441
+    },
+    "README.md": {
+      "sha256": "c5a07bd8aad439ca48beba60ef694e901b972ce22a8e220d88a502a773d331e9",
+      "bytes": 6210
+    },
+    "corpus.json": {
+      "sha256": "5f1268f03b58883708124d38f91e130f405214ab3b25a436eaa822af6f558bfb",
+      "bytes": 7876
+    },
+    "evaluator/checklist.json": {
+      "sha256": "9ab49e91fcef8a904a661d2127dd5e9a2647efdeb00f68da41bfedff400a2aa8",
+      "bytes": 27570
+    },
+    "evaluator/omission-control.json": {
+      "sha256": "37484320f95334c5983e993f5e1fd2a38af6876d5a600bd697f590fb369f9529",
+      "bytes": 550
+    },
+    "evaluator/protocol.json": {
+      "sha256": "996a1584638254259e79ada1cbc7c63db65e2204c02009671a1a76a01f45ad2e",
+      "bytes": 10162
+    },
+    "sources/D01.txt": {
+      "sha256": "6eb631b8f2ee673385ada8405157704c9f4c3a15b91d994a3fe4cc1cf426f3be",
+      "bytes": 952
+    },
+    "sources/D02.txt": {
+      "sha256": "cc12fa4405c065ce42feb9507fbcbc41d4d979efc61c1951635f5f8fbc4be61d",
+      "bytes": 1037
+    },
+    "sources/D03.txt": {
+      "sha256": "38baf02e16a80d5f4c413f20f309e71e389fcbfcecb6b8a1fb00fdc611eddc4c",
+      "bytes": 1054
+    },
+    "sources/D04.txt": {
+      "sha256": "508bd9c91c6a3d18af6029158cd669d31f263356433a478ec37d9c56d54b25f8",
+      "bytes": 982
+    },
+    "sources/D05.txt": {
+      "sha256": "8dc0ab7addffc2a1b91806ba00467c87ae0e95aaa048e453ffb8c379ec7539e8",
+      "bytes": 994
+    },
+    "sources/D06.txt": {
+      "sha256": "3db3ca53b6cc4af36b648e709c4d9e790f6972b76242595d4a61de7b2cd5500e",
+      "bytes": 1014
+    },
+    "tasks.json": {
+      "sha256": "3fa36025b4f4afbff7aeadf229eb8f87bbeb8c9cfb917898a4bbc999a3c3f694",
+      "bytes": 2427
+    },
+    "tools/fixture.py": {
+      "sha256": "0ef08d080e34dea8a6b25cda44db4d914f2227e134c0e0ebc822cb1aa5f42f88",
+      "bytes": 8885
+    },
+    "tools/test_fixture.py": {
+      "sha256": "a98590d1a712f66effe9e50228c541ce65f084def75d709fa16d5955d2f4b831",
+      "bytes": 3905
+    }
+  },
+  "revision_note": "Pre-publication review clarified input allowlist exceptions and carryforward interpretation; no candidate selection has occurred."
+}

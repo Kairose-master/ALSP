@@ -1,0 +1,6 @@
+The fictional Lantern archive pilot indexes scanned theatre programmes. This configuration applies only to pilot lane L; the production archive is outside its scope.
+For pilot lane L, the approved shard limit is 64 MiB as of 2026-04-01. MiB means 1,048,576 bytes; it does not mean decimal MB.
+Dictionary compression is not enabled for pilot lane L. A smaller shard limit alone does not enable it.
+The dashboard uses violet for queued work, amber for work in progress, and slate for completed work. These colours describe interface state only and are not QA approval indicators.
+The meeting room display rotates through three sample programme covers. Their decorative sequence is alphabetic by show title and has no relationship to the order used by the indexing jobs.
+The next documentation tidy-up will standardise section headings and rename the illustration folder. These editorial tasks do not change the pilot configuration or its review process.

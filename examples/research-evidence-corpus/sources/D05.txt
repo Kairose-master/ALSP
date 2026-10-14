@@ -1,0 +1,6 @@
+This report concerns retest B42 of pilot lane L. It is a QA observation report and does not amend configuration documents or confer authority over another QA observation report.
+For retest B42, snapshot s42 at 2026-04-06T08:00:00Z, this report records checksum mismatches in 0 of the same 20 files.
+The result is preliminary. A sample of 20 files does not establish that the archive is error-free, and this report does not approve pilot release.
+The printed comparison sheet has a wider left margin than the first QA note. The wider margin leaves room for comments and does not encode pass or fail information.
+The meeting facilitator collected questions about page rotation and thumbnail size. Those questions were assigned to a later interface discussion, with no configuration decision recorded here.
+The report was placed in the review folder alongside a blank annotation sheet. The blank sheet can be reused for future discussions and contains no additional observations about retest B42.

@@ -1,0 +1,64 @@
+{
+  "fixture_id": "lantern-evidence-v1.1",
+  "system_prompt": "Use only the supplied evidence. Answer each question separately. Distinguish earlier facts, explicitly effective updates, observations, and unresolved uncertainty. Later publication alone is not authority. Cite document ID, version, and passage ID for every factual claim. If the evidence needed for a question is absent or contradictory, say insufficient evidence or unresolved as appropriate; do not guess, use outside knowledge, or infer a missing identifier. Do not treat lack of an approval record as proof that approval never occurred.",
+  "runs": [
+    {
+      "run_id": "run1",
+      "as_of": "2026-04-02T17:00:00Z",
+      "document_ids": [
+        "D01",
+        "D02",
+        "D03"
+      ],
+      "questions": [
+        {
+          "question_id": "R1.Q1",
+          "text": "What is the approved shard limit for pilot lane L, what does its unit mean, and is dictionary compression enabled?"
+        },
+        {
+          "question_id": "R1.Q2",
+          "text": "What did initial QA observe, what is the scope of that observation, and what remains unresolved about the fix and release?"
+        },
+        {
+          "question_id": "R1.Q3",
+          "text": "What is the exact rollback package identifier for pilot lane L?"
+        }
+      ]
+    },
+    {
+      "run_id": "run2",
+      "as_of": "2026-04-06T12:00:00Z",
+      "document_ids": [
+        "D01",
+        "D02",
+        "D03",
+        "D04",
+        "D05",
+        "D06"
+      ],
+      "new_document_ids": [
+        "D04",
+        "D05",
+        "D06"
+      ],
+      "questions": [
+        {
+          "question_id": "R2.Q1",
+          "text": "How did the approved shard limit change from the earlier configuration, when did the update become effective, and do the supplied documents establish the deployed limit?"
+        },
+        {
+          "question_id": "R2.Q2",
+          "text": "Compare initial QA with the two retest reports, preserving counts, sample scope, dates, and qualifiers. Has the original question about a fix or release approval been resolved?"
+        },
+        {
+          "question_id": "R2.Q3",
+          "text": "Did dictionary compression become enabled after the configuration amendment?"
+        },
+        {
+          "question_id": "R2.Q4",
+          "text": "What is the exact rollback package identifier for pilot lane L?"
+        }
+      ]
+    }
+  ]
+}

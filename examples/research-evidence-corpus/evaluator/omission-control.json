@@ -1,0 +1,14 @@
+{
+  "fixture_id": "lantern-evidence-v1.1",
+  "origin": "HAND-CONSTRUCTED NEGATIVE CONTROL, not a provider result",
+  "source_condition": "F run2 full context",
+  "remove_passage_ids": [
+    "D03.p02"
+  ],
+  "question_id": "R2.Q4",
+  "retention_expected": "fail: C05 absent",
+  "answer_expected": "insufficient evidence; exact rollback identifier cannot be established from the supplied evidence",
+  "all_other_passages": "unchanged",
+  "no_history": true,
+  "prohibited": "Do not reveal the omission label or removal list to the downstream model."
+}

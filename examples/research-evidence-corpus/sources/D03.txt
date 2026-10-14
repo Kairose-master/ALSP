@@ -1,0 +1,6 @@
+This inventory lists support materials for the fictional Lantern pilot. It is provided to help readers identify the exact recovery package without inferring names from unrelated folders.
+The rollback package identifier for pilot lane L is lantern-revert-q7m4. No second rollback package is listed in this inventory.
+The inventory cover illustration is a line drawing of an old programme cabinet. The illustration is used in training slides and is not a diagram of the storage system.
+Spare stationery is kept in the cabinet marked rehearsal supplies. Its drawers contain index cards, removable tabs, and blank labels for reviewers who prefer to make temporary paper notes.
+The draft training agenda has three sections: opening the catalogue view, reading review notes, and locating support materials. Attendance records are maintained separately from the pilot QA record.
+A future editorial pass may replace the cover illustration with a photograph. This proposal has no scheduled date, and choosing an image will not change any listed software package.

@@ -1,0 +1,6 @@
+This note records the first small QA exercise for pilot lane L. The sample contains theatre programme scans selected for a rehearsal of the review workflow, not a random archive-wide survey.
+Initial sample A17 had checksum mismatches in 2 of 20 files on 2026-04-02. This count describes those 20 files only; an archive-wide error rate has not been established.
+It is unresolved whether the checksum problem is fixed. Retest B42 is pending, and no pilot release approval has been recorded.
+The review meeting also discussed making screenshot captions shorter. Caption wording is a documentation concern and will be handled after the QA review notes have been collected.
+A spare review desk is available beside the catalogue shelves. Booking the desk is optional; reviewers may read the exported notes elsewhere without changing the recorded test evidence.
+The team prefers landscape printouts for comparison sheets. Printing a sheet is not an approval step, and the print queue is separate from the indexing queue shown on the dashboard.

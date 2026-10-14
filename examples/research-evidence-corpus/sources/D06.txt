@@ -1,0 +1,6 @@
+This independently written QA note concerns the same retest B42 and the same snapshot as D05. Its later publication time is a record of when the note was written, not an authority ranking.
+For retest B42, snapshot s42 at 2026-04-06T08:00:00Z, this note records checksum mismatches in 1 of the same 20 files.
+This note does not supersede D05. No reconciled mismatch count or pilot release approval is recorded; the disagreement is unresolved.
+The annotation sheet used a narrow right margin and a plain title. These formatting choices were made for readability and do not distinguish this note as approved, final, or more authoritative.
+The review folder also contains an agenda for the next editorial meeting. That meeting is intended to address headings and illustration placement rather than adjudicate QA observations.
+The catalogue demonstration remains available for training with its usual sample covers. A demonstration being available is not evidence of a completed deployment or a pilot release decision.

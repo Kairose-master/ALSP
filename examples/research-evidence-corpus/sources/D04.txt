@@ -1,0 +1,6 @@
+This amendment records a configuration decision for the fictional Lantern pilot. Its version refers to the configuration document, not to the QA reports or the support inventory.
+Effective 2026-04-05T12:00:00Z, the approved shard limit for pilot lane L is 48 MiB. This explicitly supersedes the 64 MiB limit in D01 version 1.0; MiB still means 1,048,576 bytes.
+Dictionary compression remains not enabled for pilot lane L after this amendment.
+This amendment records the approved limit, not a deployment observation. It does not establish which limit is currently deployed or approve pilot release.
+The revised configuration sheet will keep the existing dashboard colours so that screenshots remain recognisable. The illustrations will be moved to an appendix in a later editorial pass.
+The change discussion was held in the same review room used for the earlier pilot notes. Seating arrangements and display settings were unchanged, and no new training attendance list was created.
