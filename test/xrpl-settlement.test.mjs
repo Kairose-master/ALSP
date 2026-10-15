@@ -9,7 +9,7 @@ const destination = 'rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh';
 const hash = 'A'.repeat(64);
 const binding = { sessionId: 's1', callId: 'c1', network: 'xrpl:1', invoiceId, destination, currency: 'XRP', amount: '1' };
 const requirement = { scheme: 'exact', network: 'xrpl:1', asset: 'XRP', payTo: destination, amount: '1000000', maxTimeoutSeconds: 60, extra: { invoiceId, sourceTag: 123 } };
-const payload = { x402Version: 2, accepted: requirement, payload: { signedTxBlob: 'AABB' } };
+const payload = { x402Version: 2, accepted: requirement, payload: { signedTxBlob: 'AABB', invoiceId: requirement.extra.invoiceId } };
 const rpc = async () => new Response(JSON.stringify({ result: {
   status: 'success', validated: true, hash, ledger_index: 10,
   tx_json: { TransactionType: 'Payment', Destination: destination, InvoiceID: createHash('sha256').update(invoiceId).digest('hex').toUpperCase() },

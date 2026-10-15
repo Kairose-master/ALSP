@@ -36,3 +36,10 @@ test('mainnet and invalid hashes never query RPC', async () => {
   await assert.rejects(fetchVerifiedXrplPayment(hash, { ...binding, network: 'xrpl:0' }, mock(transaction)));
   await assert.rejects(fetchVerifiedXrplPayment('bad', binding, mock(transaction)));
 });
+
+test('missing meta.delivered_amount falls back to Amount only for non-partial payments', async () => {
+  const { normalizeXrplTransaction } = await import('../dist/integrations/xrpl-ledger.js');
+  const base = { validated: true, hash: 'AB'.repeat(32), ledger_index: 5, tx_json: { TransactionType: 'Payment', Destination: 'rMRaxFZnyNHmqfafLbAdGbi9cHi24UhiaG', InvoiceID: 'CD'.repeat(32), Amount: '1000' }, meta: { TransactionResult: 'tesSUCCESS' } };
+  assert.equal(normalizeXrplTransaction(base).deliveredAmount.value, '0.001000');
+  assert.throws(() => normalizeXrplTransaction({ ...base, tx_json: { ...base.tx_json, Flags: 0x00020000 } }), /partial/);
+});

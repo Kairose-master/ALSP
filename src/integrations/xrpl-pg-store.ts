@@ -79,7 +79,8 @@ export class PgXrplStore implements XrplSettlementJournal {
   }
   async recordFacilitatorResponse(callId: string, response: unknown): Promise<void> {
     const r = response && typeof response === 'object' ? response as Record<string, unknown> : {};
-    const safe = { success: r.success === true, transaction: typeof r.transaction === 'string' ? r.transaction : null, network: typeof r.network === 'string' ? r.network : null };
+    const safe = { success: r.success === true, transaction: typeof r.transaction === 'string' ? r.transaction : null, network: typeof r.network === 'string' ? r.network : null,
+      errorReason: typeof r.errorReason === 'string' ? r.errorReason.slice(0, 200) : null };
     const res = await this.db.query("UPDATE xrpl_invoices SET response=$2::jsonb WHERE call_id=$1 AND state IN ('SETTLING','RECONCILIATION_REQUIRED')", [callId, JSON.stringify(safe)]);
     if (res.rowCount !== 1) throw new Error('No active submission');
   }

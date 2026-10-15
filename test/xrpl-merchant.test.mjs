@@ -11,7 +11,7 @@ const URL = process.env.TEST_DATABASE_URL;
 const skip = URL ? false : 'TEST_DATABASE_URL not set';
 const ORIGIN = 'https://example.test';
 const buyer = Wallet.generate();
-const headerOf = (accepted, blob) => Buffer.from(JSON.stringify({ x402Version: 2, accepted, payload: { signedTxBlob: blob } })).toString('base64');
+const headerOf = (accepted, blob) => Buffer.from(JSON.stringify({ x402Version: 2, accepted, payload: { signedTxBlob: blob, invoiceId: accepted.extra.invoiceId } })).toString('base64');
 function sign(req, over = {}) {
   const tx = { TransactionType: 'Payment', Account: buyer.address, Destination: req.payTo, Amount: req.amount, Fee: '12', Sequence: 1,
     LastLedgerSequence: 99999999, SourceTag: req.extra.sourceTag, InvoiceID: xrplInvoiceField(req.extra.invoiceId), ...over };

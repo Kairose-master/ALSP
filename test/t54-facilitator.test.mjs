@@ -8,7 +8,7 @@ const requirement = {
   amount: '1000000', maxTimeoutSeconds: 600,
   extra: { invoiceId: 'alsp-session-call-1', sourceTag: 804681468 }
 };
-const payload = { x402Version: 2, accepted: requirement, payload: { signedTxBlob: 'AABB' } };
+const payload = { x402Version: 2, accepted: requirement, payload: { signedTxBlob: 'AABB', invoiceId: requirement.extra.invoiceId } };
 
 test('InvoiceID field hashes UTF-8 invoice identifier', () => {
   assert.match(xrplInvoiceField(requirement.extra.invoiceId), /^[A-F0-9]{64}$/);

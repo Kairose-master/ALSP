@@ -6,6 +6,15 @@
 import { verifyXrplSettlement, type XrplLedgerEvidence, type XrplPaymentBinding } from './xrpl-evidence.js';
 
 export const XRPL_TESTNET_RPC = 'https://s.altnet.rippletest.net:51234/';
+/** Alternate public testnet JSON-RPC endpoints, selectable only from this allowlist. */
+export const XRPL_TESTNET_RPC_ALLOWLIST = [XRPL_TESTNET_RPC, 'https://testnet.xrpl-labs.com/'];
+export function xrplTestnetRpc(env: Record<string, string | undefined> = process.env): string {
+  const override = env.XRPL_TESTNET_RPC_URL;
+  if (!override) return XRPL_TESTNET_RPC;
+  const normalized = override.endsWith('/') ? override : override + '/';
+  if (!XRPL_TESTNET_RPC_ALLOWLIST.includes(normalized)) throw new Error('XRPL RPC endpoint not allowlisted');
+  return normalized;
+}
 const HASH = /^[0-9A-Fa-f]{64}$/;
 
 export function normalizeXrplTransaction(raw: unknown): XrplLedgerEvidence {
@@ -13,7 +22,14 @@ export function normalizeXrplTransaction(raw: unknown): XrplLedgerEvidence {
   const r = raw as Record<string, unknown>;
   const tx = (r.tx_json && typeof r.tx_json === 'object' ? r.tx_json : r) as Record<string, unknown>;
   const meta = (r.meta && typeof r.meta === 'object' ? r.meta : {}) as Record<string, unknown>;
-  const delivered = meta.delivered_amount;
+  let delivered = meta.delivered_amount;
+  // Some servers omit meta.delivered_amount. Without tfPartialPayment a successful Payment delivers exactly Amount;
+  // with the flag and no delivered_amount the delivered value is unknowable, so fail closed.
+  if (delivered === undefined || delivered === 'unavailable') {
+    const flags = Number(tx.Flags ?? 0);
+    if (!Number.isSafeInteger(flags) || (flags & 0x00020000) !== 0) throw new Error('Delivered amount unavailable for partial payment');
+    delivered = tx.Amount;
+  }
   let deliveredAmount: XrplLedgerEvidence['deliveredAmount'];
   if (typeof delivered === 'string' && /^[0-9]+$/.test(delivered)) {
     const drops = BigInt(delivered);
@@ -44,7 +60,7 @@ export async function fetchVerifiedXrplPayment(
 ): Promise<XrplLedgerEvidence> {
   if (binding.network !== 'xrpl:1') throw new Error('Only XRPL testnet is enabled');
   if (!HASH.test(transactionHash)) throw new Error('Invalid transaction hash');
-  const response = await fetchImpl(XRPL_TESTNET_RPC, {
+  const response = await fetchImpl(xrplTestnetRpc(), {
     method: 'POST',
     headers: { 'content-type': 'application/json', accept: 'application/json' },
     body: JSON.stringify({ method: 'tx', params: [{ transaction: transactionHash, binary: false }] }),

@@ -59,7 +59,7 @@ export function parsePaymentHeader(raw: string): XrplPaymentPayload {
   try { v = JSON.parse(Buffer.from(raw, 'base64').toString('utf8')); } catch { throw new Error('Malformed payment header'); }
   const p = v as XrplPaymentPayload;
   if (!p || p.x402Version !== 2 || !p.accepted || typeof p.accepted !== 'object' || !p.accepted.extra ||
-      typeof p.payload?.signedTxBlob !== 'string' || !/^(?:[0-9a-fA-F]{2})+$/.test(p.payload.signedTxBlob)) throw new Error('Malformed payment payload');
+      typeof p.payload?.signedTxBlob !== 'string' || p.payload.invoiceId !== p.accepted.extra.invoiceId || !/^(?:[0-9a-fA-F]{2})+$/.test(p.payload.signedTxBlob)) throw new Error('Malformed payment payload');
   return p;
 }
 
@@ -108,7 +108,7 @@ export class XrplMerchant {
     }
     if (inv.expiresAt.getTime() <= this.now().getTime()) return this.challenge(origin, 'Challenge expired; pay the new requirement');
 
-    const canonical: XrplPaymentPayload = { x402Version: 2, accepted: inv.requirement, payload: payload.payload };
+    const canonical: XrplPaymentPayload = { x402Version: 2, accepted: inv.requirement, payload: { signedTxBlob: payload.payload.signedTxBlob, invoiceId: inv.invoiceId } };
     try {
       const v = await this.d.facilitator.verify(canonical, inv.requirement);
       if (v.isValid !== true) return this.fail(402, 'Facilitator rejected payment: ' + String(v.invalidReason ?? 'invalid'));

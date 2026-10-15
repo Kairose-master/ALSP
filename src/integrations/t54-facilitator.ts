@@ -17,7 +17,7 @@ export interface XrplRequirement {
 export interface XrplPaymentPayload {
   x402Version: 2;
   accepted: XrplRequirement;
-  payload: { signedTxBlob: string };
+  payload: { signedTxBlob: string; invoiceId: string };
 }
 export interface T54Settlement {
   success: boolean;
@@ -53,7 +53,8 @@ export class T54Facilitator {
     validateRequirement(paymentRequirements, this.network);
     if (paymentPayload.x402Version !== 2 || paymentPayload.accepted.scheme !== 'exact' ||
       JSON.stringify(paymentPayload.accepted) !== JSON.stringify(paymentRequirements) ||
-      !/^(?:[0-9a-fA-F]{2})+$/.test(paymentPayload.payload?.signedTxBlob ?? '')) throw new Error('Invalid signed payment envelope');
+      !/^(?:[0-9a-fA-F]{2})+$/.test(paymentPayload.payload?.signedTxBlob ?? '') ||
+      paymentPayload.payload?.invoiceId !== paymentRequirements.extra.invoiceId) throw new Error('Invalid signed payment envelope');
     const response = await this.fetchImpl(this.baseUrl + path, {
       method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json' },
       body: JSON.stringify({ paymentPayload, paymentRequirements }), redirect: 'error',
