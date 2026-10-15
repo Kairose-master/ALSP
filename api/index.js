@@ -10,7 +10,10 @@ export default async function handler(req, res) {
   if (url.pathname === XRPL_RESOURCE || url.pathname === '/api/xrpl/directory' || url.pathname === '/.well-known/x402') {
     res.setHeader('cache-control', 'no-store');
     res.setHeader('content-type', 'application/json; charset=utf-8');
-    const origin = 'https://alsp.vercel.app';
+    const configuredHost = process.env.VERCEL_URL;
+    const origin = configuredHost && /^[a-z0-9-]+(?:\.[a-z0-9-]+)*\.vercel\.app$/i.test(configuredHost)
+      ? 'https://' + configuredHost
+      : 'https://alsp.vercel.app';
     if (req.method === 'GET' && (url.pathname === '/api/xrpl/directory' || url.pathname === '/.well-known/x402')) return res.status(200).json(xrplDirectoryMetadata(origin));
     if (url.pathname !== XRPL_RESOURCE || req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
     if (req.headers['payment-signature'] || req.headers['x-payment']) return res.status(501).json({ error: 'Paid XRPL settlement not yet implemented; payment not processed' });
