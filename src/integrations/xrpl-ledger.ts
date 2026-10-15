@@ -23,7 +23,7 @@ export function normalizeXrplTransaction(raw: unknown): XrplLedgerEvidence {
     if (typeof a.currency !== 'string' || typeof a.value !== 'string' || typeof a.issuer !== 'string') throw new Error('Invalid issued amount');
     deliveredAmount = { currency: a.currency, value: a.value, issuer: a.issuer };
   } else throw new Error('Missing delivered amount');
-  if (typeof tx.InvoiceID !== 'string' || typeof tx.Destination !== 'string' || typeof r.hash !== 'string' || !HASH.test(r.hash))
+  if (typeof tx.InvoiceID !== 'string' || typeof tx.Destination !== 'string' || typeof r.hash !== 'string' || !HASH.test(r.hash) || r.validated !== true)
     throw new Error('Missing transaction binding');
   return {
     validated: r.validated === true,
