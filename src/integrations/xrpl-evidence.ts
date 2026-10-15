@@ -56,6 +56,6 @@ export function verifyXrplSettlement(binding: XrplPaymentBinding, evidence: Xrpl
   if (!actual || actual.currency !== binding.currency || (actual.issuer ?? undefined) !== (binding.issuer ?? undefined)) return false;
   if (!decimal.test(actual.value)) return false;
   // Exact decimal equality without floating-point rounding.
-  const normalize = (v: string) => { const [whole, fraction = ''] = v.split('.'); return whole.replace(/^0+(?=\d)/, '') + '.' + fraction.replace(/0+$/, ''); };
+  const normalize = (v: string) => { const [whole = '', fraction = ''] = v.split('.'); return whole.replace(/^0+(?=\d)/, '') + '.' + fraction.replace(/0+$/, ''); };
   return normalize(actual.value) === normalize(binding.amount);
 }
