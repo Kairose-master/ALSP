@@ -20,12 +20,16 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.131.0",
+    "@types/pg": "^8.23.1",
     "@vercel/blob": "^2.8.1",
+    "pg": "^8.23.1",
+    "ripple-binary-codec": "^2.11.0",
     "viem": "2.56.8"
   },
   "devDependencies": {
     "@types/node": "22.15.30",
     "esbuild": "^0.25.10",
-    "typescript": "5.9.2"
+    "typescript": "5.9.2",
+    "xrpl": "^4.7.0"
   }
 }
