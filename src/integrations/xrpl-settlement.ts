@@ -53,6 +53,25 @@ export class XrplSettlementCoordinator {
       throw error;
     }
   }
+  /** Recovery never invokes facilitator settlement. Missing bindings remain unresolved. */
+  async recoverPending(
+    pending: ReadonlyArray<{ callId: string; transactionHash: string }>,
+    bindingFor: (callId: string) => Promise<XrplPaymentBinding | null>,
+  ): Promise<{ verified: string[]; unresolved: string[] }> {
+    const verified: string[] = [], unresolved: string[] = [];
+    for (const attempt of pending) {
+      try {
+        const binding = await bindingFor(attempt.callId);
+        if (!binding) throw new Error('Missing persisted payment binding');
+        await this.reconcile(attempt.callId, attempt.transactionHash, binding);
+        verified.push(attempt.callId);
+      } catch {
+        unresolved.push(attempt.callId);
+        try { await this.journal.markUnresolved(attempt.callId); } catch { /* report unresolved */ }
+      }
+    }
+    return { verified, unresolved };
+  }
   /** Reconciliation performs read-only ledger lookup, never calls /settle again. */
   async reconcile(callId: string, transactionHash: string, binding: XrplPaymentBinding): Promise<XrplLedgerEvidence> {
     if (callId !== binding.callId || binding.network !== 'xrpl:1') throw new Error('Invalid reconciliation identity');
