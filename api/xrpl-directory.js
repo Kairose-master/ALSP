@@ -1,11 +1,11 @@
 // XRPL testnet-only resource advertisement. Does not accept or settle payments yet.
 // This intentionally cannot grant access on receipt of an unverified payment header.
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 
 export const XRPL_PAY_TO = 'rMRaxFZnyNHmqfafLbAdGbi9cHi24UhiaG';
 export const XRPL_RESOURCE = '/api/xrpl/paid-resource';
 export function xrplChallenge(origin) {
-  const invoiceId = 'alsp-directory-' + randomUUID();
+  const invoiceId = createHash('sha256').update('ALSP-XRPL-TESTNET-CHALLENGE-V1:' + randomUUID()).digest('hex').toUpperCase();
   return {
     x402Version: 2,
     error: 'Payment required; paid access is not enabled until settlement verification is deployed',
