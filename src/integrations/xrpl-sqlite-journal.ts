@@ -68,6 +68,11 @@ export class SqliteXrplSettlementJournal implements XrplSettlementJournal {
       this.db.prepare('UPDATE xrpl_attempts SET state=? WHERE call_id=?').run('RECONCILIATION_REQUIRED', callId);
     });
   }
+  /** Return durable pending attempts for read-only recovery after restart. */
+  pendingAttempts(): Array<{ callId: string; transactionHash: string; state: string }> {
+    return this.db.prepare("SELECT call_id,transaction_hash,state FROM xrpl_attempts WHERE state != 'VERIFIED' ORDER BY rowid").all()
+      .map(row => ({ callId: String(row.call_id), transactionHash: String(row.transaction_hash), state: String(row.state) }));
+  }
   attempt(callId: string): { transactionHash: string; state: string; response: unknown; evidence: XrplLedgerEvidence | null } | null {
     const row = this.db.prepare('SELECT * FROM xrpl_attempts WHERE call_id=?').get(callId);
     if (!row) return null;
