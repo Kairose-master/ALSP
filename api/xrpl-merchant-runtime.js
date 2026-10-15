@@ -1,9 +1,7 @@
 // Lazily builds the live XRPL merchant when a shared PostgreSQL database is configured.
 // Without DATABASE_URL/POSTGRES_URL the endpoint stays in its fail-closed, non-live mode.
 import pg from 'pg';
-import { PgXrplStore } from '../dist/integrations/xrpl-pg-store.js';
-import { XrplMerchant } from '../dist/integrations/xrpl-merchant.js';
-import { T54Facilitator } from '../dist/integrations/t54-facilitator.js';
+import { PgXrplStore, XrplMerchant, T54Facilitator } from '../dist/xrpl-runtime.bundle.mjs';
 
 let ready;
 export function getXrplMerchant(env = process.env) {
