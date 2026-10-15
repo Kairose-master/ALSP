@@ -1,4 +1,4 @@
-import test from 'node:test';
+import test from 'node:test';\nimport { createHash } from 'node:crypto';
 import assert from 'node:assert/strict';
 import { invoiceIdForCall, validateXrplBinding, verifyXrplSettlement } from '../dist/integrations/xrpl-evidence.js';
 
@@ -11,7 +11,7 @@ const binding = {
 const evidence = {
   validated: true, transactionType: 'Payment', result: 'tesSUCCESS',
   hash: 'A'.repeat(64), ledgerIndex: 100,
-  invoiceId: binding.invoiceId, destination: binding.destination,
+  invoiceId: createHash('sha256').update(binding.invoiceId).digest('hex').toUpperCase(), destination: binding.destination,
   deliveredAmount: { currency: 'XRP', value: '1.5000' }
 };
 
