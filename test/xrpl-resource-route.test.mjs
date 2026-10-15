@@ -43,3 +43,18 @@ test('well-known XRPL discovery remains explicitly experimental', async () => {
   assert.match(r.body.description, /not yet live/);
   assert.equal(r.body.resources[0].url, 'https://alsp.vercel.app/api/xrpl/paid-resource');
 });
+
+test('preview discovery and payment challenge use the same deployment origin', async () => {
+  const prior = process.env.VERCEL_URL;
+  process.env.VERCEL_URL = 'alsp-preview-123.vercel.app';
+  try {
+    const directory = await request('/.well-known/x402');
+    const payment = await request('/api/xrpl/paid-resource');
+    const expected = 'https://alsp-preview-123.vercel.app/api/xrpl/paid-resource';
+    assert.equal(directory.body.resources[0].url, expected);
+    assert.equal(payment.body.resource.url, expected);
+  } finally {
+    if (prior === undefined) delete process.env.VERCEL_URL;
+    else process.env.VERCEL_URL = prior;
+  }
+});
