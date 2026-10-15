@@ -51,7 +51,9 @@ export function verifyXrplSettlement(binding: XrplPaymentBinding, evidence: Xrpl
   validateXrplBinding(binding);
   if (!evidence.validated || evidence.transactionType !== 'Payment' || evidence.result !== 'tesSUCCESS') return false;
   if (!hex64.test(evidence.hash) || !Number.isSafeInteger(evidence.ledgerIndex) || evidence.ledgerIndex <= 0) return false;
-  // t54 hashes the invoice identifier again when writing XRPL InvoiceID.\n  const ledgerInvoiceId = createHash('sha256').update(binding.invoiceId, 'utf8').digest('hex').toUpperCase();\n  if (evidence.invoiceId !== ledgerInvoiceId || evidence.destination !== binding.destination) return false;
+  // t54 hashes the invoice identifier again when writing XRPL InvoiceID.
+  const ledgerInvoiceId = createHash('sha256').update(binding.invoiceId, 'utf8').digest('hex').toUpperCase();
+  if (evidence.invoiceId !== ledgerInvoiceId || evidence.destination !== binding.destination) return false;
   const actual = evidence.deliveredAmount;
   if (!actual || actual.currency !== binding.currency || (actual.issuer ?? undefined) !== (binding.issuer ?? undefined)) return false;
   if (!decimal.test(actual.value)) return false;
