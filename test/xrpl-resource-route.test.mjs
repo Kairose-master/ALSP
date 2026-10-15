@@ -36,3 +36,10 @@ test('directory is discoverable and discloses no live settlement', async () => {
   assert.equal(r.statusCode, 200);
   assert.match(r.body.description, /not yet live/);
 });
+
+test('well-known XRPL discovery remains explicitly experimental', async () => {
+  const r = await request('/.well-known/x402');
+  assert.equal(r.statusCode, 200);
+  assert.match(r.body.description, /not yet live/);
+  assert.equal(r.body.resources[0].url, 'https://alsp.vercel.app/api/xrpl/paid-resource');
+});
