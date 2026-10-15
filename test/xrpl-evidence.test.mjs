@@ -1,4 +1,5 @@
-import test from 'node:test';\nimport { createHash } from 'node:crypto';
+import test from 'node:test';
+import { createHash } from 'node:crypto';
 import assert from 'node:assert/strict';
 import { invoiceIdForCall, validateXrplBinding, verifyXrplSettlement } from '../dist/integrations/xrpl-evidence.js';
 
