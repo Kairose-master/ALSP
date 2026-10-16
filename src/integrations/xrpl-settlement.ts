@@ -33,8 +33,8 @@ export class XrplSettlementCoordinator {
     private readonly ledgerFetch: typeof fetch = fetch,
   ) {}
   async settleOnce(input: XrplSettlementInput): Promise<XrplLedgerEvidence> {
-    if (this.facilitator.network !== 'xrpl:1' || input.binding.network !== 'xrpl:1' ||
-        input.requirement.network !== 'xrpl:1') throw new Error('Testnet only');
+    if (input.binding.network !== this.facilitator.network || input.requirement.network !== this.facilitator.network)
+      throw new Error('Network mismatch');
     if (input.callId !== input.binding.callId) throw new Error('Call identity mismatch');
     if (input.requirement.extra.invoiceId !== input.binding.invoiceId) throw new Error('Invoice identity mismatch');
     // The caller must ensure this journal method is atomic and durable.
@@ -74,7 +74,7 @@ export class XrplSettlementCoordinator {
   }
   /** Reconciliation performs read-only ledger lookup, never calls /settle again. */
   async reconcile(callId: string, transactionHash: string, binding: XrplPaymentBinding): Promise<XrplLedgerEvidence> {
-    if (callId !== binding.callId || binding.network !== 'xrpl:1') throw new Error('Invalid reconciliation identity');
+    if (callId !== binding.callId || (binding.network !== 'xrpl:1' && binding.network !== 'xrpl:0')) throw new Error('Invalid reconciliation identity');
     try {
       const proof = await fetchVerifiedXrplPayment(transactionHash, binding, this.ledgerFetch);
       await this.journal.markVerified(callId, proof);

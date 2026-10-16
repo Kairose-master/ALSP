@@ -32,9 +32,16 @@ test('unvalidated and mismatched transactions fail closed', async () => {
     { hash: 'B'.repeat(64) }
   ]) await assert.rejects(fetchVerifiedXrplPayment(hash, binding, mock({ ...transaction, ...patch })));
 });
-test('mainnet and invalid hashes never query RPC', async () => {
-  await assert.rejects(fetchVerifiedXrplPayment(hash, { ...binding, network: 'xrpl:0' }, mock(transaction)));
+test('invalid hashes and unsupported networks never query RPC', async () => {
   await assert.rejects(fetchVerifiedXrplPayment('bad', binding, mock(transaction)));
+  await assert.rejects(fetchVerifiedXrplPayment(hash, { ...binding, network: 'xrpl:9' }, mock(transaction)));
+});
+test('RPC endpoint is chosen per network and only from allowlists', async () => {
+  const { xrplRpcUrl, XRPL_MAINNET_RPC, XRPL_TESTNET_RPC } = await import('../dist/integrations/xrpl-ledger.js');
+  assert.equal(xrplRpcUrl('xrpl:0', {}), XRPL_MAINNET_RPC);
+  assert.equal(xrplRpcUrl('xrpl:1', {}), XRPL_TESTNET_RPC);
+  assert.throws(() => xrplRpcUrl('xrpl:0', { XRPL_MAINNET_RPC_URL: 'https://evil.example/' }), /allowlisted/);
+  assert.throws(() => xrplRpcUrl('xrpl:5', {}), /Unsupported/);
 });
 
 test('missing meta.delivered_amount falls back to Amount only for non-partial payments', async () => {

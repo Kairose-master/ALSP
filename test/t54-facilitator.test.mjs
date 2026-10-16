@@ -30,7 +30,16 @@ test('settle requires opt-in and rejects mainnet', async () => {
   await assert.rejects(client.settle(payload, requirement, false));
   assert.equal((await client.settle(payload, requirement, true)).success, true);
   const mainnet = new T54Facilitator('xrpl:0', async () => { throw new Error('must not fetch'); });
-  await assert.rejects(mainnet.settle(payload, { ...requirement, network: 'xrpl:0' }, true));
+  await assert.rejects(mainnet.settle(payload, { ...requirement, network: 'xrpl:0' }, true), /Settlement disabled/);
+});
+test('mainnet settle needs both the construction-time and the per-call opt-in', async () => {
+  const req = { ...requirement, network: 'xrpl:0' };
+  const pay = { ...payload, accepted: req };
+  const ok = async () => new Response(JSON.stringify({ success: true, network: 'xrpl:0', transaction: 'A'.repeat(64) }));
+  const enabled = new T54Facilitator('xrpl:0', ok, { allowMainnetSettle: true });
+  await assert.rejects(enabled.settle(pay, req, false), /Settlement disabled/);
+  assert.equal((await enabled.settle(pay, req, true)).success, true);
+  assert.equal(enabled.baseUrl, 'https://xrpl-facilitator-mainnet.t54.ai');
 });
 test('mismatched requirements and XRP decimals are rejected before network', async () => {
   const client = new T54Facilitator('xrpl:1', async () => { throw new Error('must not fetch'); });

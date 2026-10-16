@@ -37,3 +37,11 @@ Verified: 101 tests including real-Postgres concurrency, replay, timeout/restart
 Findings from the real E2E (not caught by mocks): t54 requires `payload.invoiceId` (raw requirement value) next to `signedTxBlob`; some servers omit `meta.delivered_amount`; the payee account must exist on testnet (it was activated via the public faucet; a 1000-drop payment cannot create it, `tecNO_DST_INSUF_XRP`).
 
 Remaining gates (external): provision PostgreSQL on the Vercel project and set `DATABASE_URL`; run `scripts/xrpl-e2e-buyer.mjs` against the deployed URL; `curl -i` the public URL and `/.well-known/x402`; then submit at the registration form.
+
+## Mainnet (2026-10-16)
+
+Production defaults to **XRPL mainnet (`xrpl:0`)** at **10,000 drops (0.01 XRP)**; previews default to testnet. Overrides: `XRPL_NETWORK` (`xrpl:0`/`xrpl:1`), `XRPL_PRICE_DROPS`. The payee `rMRaxFZnyNHmqfafLbAdGbi9cHi24UhiaG` is fixed in code (not configurable). Mainnet settlement requires the facilitator to be constructed with `allowMainnetSettle` (done only by the runtime when the configured network is mainnet) plus the per-call opt-in.
+
+Safety: the merchant issues no challenge (HTTP 503) while the payee account does not exist on the target network's validated ledger, because an underfunded payment to a missing account fails with `tecNO_DST_INSUF_XRP` and burns the payer's fee. The mainnet payee must hold at least the base reserve (1 XRP at time of writing) before sales start.
+
+Ledger RPC: mainnet `https://xrplcluster.com/` (override `XRPL_MAINNET_RPC_URL`, allowlisted: xrplcluster.com, s1/s2.ripple.com:51234).
