@@ -24,8 +24,8 @@ export function xrplChallenge(origin) {
 export function xrplDirectoryMetadata(origin, live = false) {
   if (live) return {
     name: 'ALSP XRPL session evidence (testnet)',
-    description: 'Pay 0.001 XRP (testnet, x402 exact via t54) and receive a ledger-verified, payment-bound ALSP session evidence record as JSON.',
-    resources: [{ url: origin + XRPL_RESOURCE, name: 'ALSP XRPL session evidence', description: 'Payment-bound, ledger-verified JSON evidence record (testnet, 1000 drops).' }]
+    description: 'Pay in XRP (x402 exact via t54) and receive a ledger-verified, payment-bound ALSP session evidence record as JSON.',
+    resources: [{ url: origin + XRPL_RESOURCE, name: 'ALSP XRPL session evidence', description: 'Payment-bound, ledger-verified JSON evidence record (price set in the 402 challenge).' }]
   };
   return {
     name: 'ALSP XRPL testnet research endpoint',

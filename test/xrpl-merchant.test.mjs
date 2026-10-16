@@ -4,7 +4,7 @@ import pg from 'pg';
 import { Wallet } from 'xrpl';
 import { decode } from 'ripple-binary-codec';
 import { PgXrplStore } from '../dist/integrations/xrpl-pg-store.js';
-import { XrplMerchant, checkSignedBlob, transactionHashOfBlob } from '../dist/integrations/xrpl-merchant.js';
+import { XrplMerchant, MAINNET_CONFIG, merchantConfigFromEnv, checkSignedBlob, transactionHashOfBlob } from '../dist/integrations/xrpl-merchant.js';
 import { T54Facilitator, xrplInvoiceField } from '../dist/integrations/t54-facilitator.js';
 
 const URL = process.env.TEST_DATABASE_URL;
@@ -26,9 +26,14 @@ function world({ settleBehavior = 'ok', ledger = 'ok' } = {}) {
     calls.settle++;
     if (state.settleBehavior === 'timeout') throw new Error('timeout');
     const hash = transactionHashOfBlob(body.paymentPayload.payload.signedTxBlob);
-    return Response.json({ success: true, transaction: hash, network: 'xrpl:1' });
+    return Response.json({ success: true, transaction: hash, network: body.paymentRequirements.network });
   };
   const ledgerFetch = async (_u, init) => {
+    const reqBody = JSON.parse(init.body);
+    if (reqBody.method === 'server_info') return Response.json({ result: { info: { validated_ledger: { reserve_base_xrp: 1 } } } });
+    if (reqBody.method === 'account_info') {
+      return Response.json({ result: state.payee === false ? { status: 'error', error: 'actNotFound' } : { status: 'success', account_data: { Balance: '2000000' } } });
+    }
     calls.ledger++;
     if (state.ledger !== 'ok') return Response.json({ result: { status: 'error', error: 'txnNotFound' } });
     const hash = JSON.parse(init.body).params[0].transaction;
@@ -148,5 +153,81 @@ test('expired challenges cannot be paid and unknown invoices get a fresh 402', {
   assert.equal(w.calls.settle, 0);
   const forged = { ...req, extra: { ...req.extra, invoiceId: 'AB'.repeat(32) } };
   assert.equal((await m.handle(ORIGIN, headerOf(forged, sign(forged)))).status, 402);
+  await pool.end();
+});
+
+test('config: production defaults to mainnet at 0.01 XRP, previews to testnet, overrides validated', () => {
+  assert.deepEqual([merchantConfigFromEnv({ VERCEL_ENV: 'production' }).network, merchantConfigFromEnv({ VERCEL_ENV: 'production' }).amountDrops], ['xrpl:0', '10000']);
+  assert.equal(merchantConfigFromEnv({}).network, 'xrpl:0');
+  assert.equal(merchantConfigFromEnv({ VERCEL_ENV: 'preview' }).network, 'xrpl:1');
+  assert.equal(merchantConfigFromEnv({ XRPL_NETWORK: 'xrpl:1', VERCEL_ENV: 'production' }).amountDrops, '1000');
+  assert.equal(merchantConfigFromEnv({ XRPL_PRICE_DROPS: '25000' }).amountDrops, '25000');
+  assert.equal(merchantConfigFromEnv({}).payTo, 'rMRaxFZnyNHmqfafLbAdGbi9cHi24UhiaG');
+  assert.throws(() => merchantConfigFromEnv({ XRPL_NETWORK: 'xrpl:7' }));
+  assert.throws(() => merchantConfigFromEnv({ XRPL_PRICE_DROPS: '0' }));
+});
+
+test('mainnet: full paid flow at the mainnet price, bound to xrpl:0', { skip }, async () => {
+  const pool = await setup(); const w = world();
+  const m = new XrplMerchant({ store: new PgXrplStore(pool), facilitator: new T54Facilitator('xrpl:0', w.facFetch, { allowMainnetSettle: true }),
+    ledgerFetch: w.ledgerFetch, config: MAINNET_CONFIG, sleep: async () => {}, reconcileAttempts: 2 });
+  const { ch, req, blob, hash } = await prepare(m, w);
+  assert.equal(ch.status, 402);
+  assert.equal(req.network, 'xrpl:0'); assert.equal(req.amount, '10000');
+  const r = await m.handle(ORIGIN, headerOf(req, blob));
+  assert.equal(r.status, 200);
+  assert.equal(r.body.network, 'xrpl:0');
+  assert.equal(r.body.payment.transaction, hash);
+  assert.equal(r.body.payment.delivered.value, '0.010000');
+  assert.equal(w.calls.settle, 1);
+  const row = (await pool.query('SELECT state,response FROM xrpl_invoices')).rows[0];
+  assert.equal(row.state, 'VERIFIED');
+  assert.equal(row.response.success, true, 'settled on the normal path, not via recovery');
+  await pool.end();
+});
+
+test('payee not activated: one disclosed activation-priced sale, then the regular price', { skip }, async () => {
+  const pool = await setup(); const w = world(); w.state.payee = false;
+  const m = merchant(pool, w);
+  const ch = await m.challenge(ORIGIN);
+  assert.equal(ch.status, 402);
+  assert.equal(ch.body.accepts[0].amount, '1000000');
+  assert.match(ch.body.error, /one-time activation price/);
+  assert.match(ch.body.resource.description, /regular price is 1000 drops/);
+  // the payee becomes active: stale activation-priced challenges are refused, new ones use the regular price
+  const stale = await prepare(m, w);
+  w.state.payee = true;
+  const m2 = merchant(pool, w);
+  const refused = await m2.handle(ORIGIN, headerOf(stale.req, stale.blob));
+  assert.equal(refused.status, 402);
+  assert.match(refused.body.error, /Price changed/);
+  assert.equal(w.calls.settle, 0);
+  assert.equal((await m2.challenge(ORIGIN)).body.accepts[0].amount, '1000');
+  await pool.end();
+});
+
+test('payee not activated and activation sale disabled: sales are paused with 503', { skip }, async () => {
+  const pool = await setup(); const w = world(); w.state.payee = false;
+  const r = await merchant(pool, w, { activationSale: false }).challenge(ORIGIN);
+  assert.equal(r.status, 503);
+  assert.match(r.body.error, /not activated/);
+  assert.equal((await pool.query('SELECT count(*)::int AS n FROM xrpl_invoices')).rows[0].n, 0);
+  await pool.end();
+});
+
+test('activation payment is accepted and settles at the activation price', { skip }, async () => {
+  const pool = await setup(); const w = world(); w.state.payee = false;
+  const m = merchant(pool, w);
+  const { req, blob } = await prepare(m, w);
+  assert.equal(req.amount, '1000000');
+  const r = await m.handle(ORIGIN, headerOf(req, blob));
+  assert.equal(r.status, 200);
+  assert.equal(r.body.payment.delivered.value, '1.000000');
+  await pool.end();
+});
+
+test('merchant refuses a facilitator on another network', { skip }, async () => {
+  const pool = await setup(); const w = world();
+  assert.throws(() => new XrplMerchant({ store: new PgXrplStore(pool), facilitator: new T54Facilitator('xrpl:1', w.facFetch), config: MAINNET_CONFIG }), /networks differ/);
   await pool.end();
 });
