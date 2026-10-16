@@ -58,3 +58,19 @@ test('preview discovery and payment challenge use the same deployment origin', a
     else process.env.VERCEL_URL = prior;
   }
 });
+
+test('production always advertises the canonical domain, never the per-deployment host', async () => {
+  const prior = { url: process.env.VERCEL_URL, env: process.env.VERCEL_ENV };
+  process.env.VERCEL_URL = 'alsp-44476tckr-godavid123-3215s-projects.vercel.app';
+  process.env.VERCEL_ENV = 'production';
+  try {
+    const directory = await request('/.well-known/x402');
+    const payment = await request('/api/xrpl/paid-resource');
+    const expected = 'https://alsp.vercel.app/api/xrpl/paid-resource';
+    assert.equal(directory.body.resources[0].url, expected);
+    assert.equal(payment.body.resource.url, expected);
+  } finally {
+    if (prior.url === undefined) delete process.env.VERCEL_URL; else process.env.VERCEL_URL = prior.url;
+    if (prior.env === undefined) delete process.env.VERCEL_ENV; else process.env.VERCEL_ENV = prior.env;
+  }
+});

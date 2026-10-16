@@ -12,7 +12,7 @@ export default async function handler(req, res) {
     res.setHeader('cache-control', 'no-store');
     res.setHeader('content-type', 'application/json; charset=utf-8');
     const configuredHost = process.env.VERCEL_URL;
-    const origin = configuredHost && /^[a-z0-9-]+(?:\.[a-z0-9-]+)*\.vercel\.app$/i.test(configuredHost)
+    const origin = process.env.VERCEL_ENV === 'production' ? 'https://alsp.vercel.app' : configuredHost && /^[a-z0-9-]+(?:\.[a-z0-9-]+)*\.vercel\.app$/i.test(configuredHost)
       ? 'https://' + configuredHost
       : 'https://alsp.vercel.app';
     const merchant = await getXrplMerchant();
