@@ -35,6 +35,18 @@ export async function payeeActivated(address: string, network: string, fetchImpl
   if (body?.result?.error === 'actNotFound') return false;
   throw new Error('Unexpected account_info response');
 }
+/** Read-only: current base reserve in drops from the validated ledger. */
+export async function baseReserveDrops(network: string, fetchImpl: typeof fetch = fetch): Promise<bigint> {
+  const response = await fetchImpl(xrplRpcUrl(network), {
+    method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json' },
+    body: JSON.stringify({ method: 'server_info', params: [{}] }), signal: AbortSignal.timeout(8000), redirect: 'error',
+  });
+  if (!response.ok) throw new Error('XRPL RPC HTTP failure');
+  const body = await response.json() as { result?: { info?: { validated_ledger?: { reserve_base_xrp?: unknown } } } };
+  const xrp = body?.result?.info?.validated_ledger?.reserve_base_xrp;
+  if (typeof xrp !== 'number' || !(xrp > 0) || xrp > 100) throw new Error('Unexpected server_info response');
+  return BigInt(Math.round(xrp * 1_000_000));
+}
 export function xrplTestnetRpc(env: Record<string, string | undefined> = process.env): string {
   const override = env.XRPL_TESTNET_RPC_URL;
   if (!override) return XRPL_TESTNET_RPC;

@@ -14,7 +14,7 @@ export function getXrplMerchant(env = process.env) {
     const store = new PgXrplStore(pool);
     await store.migrate();
     const facilitator = new T54Facilitator(config.network, fetch, { allowMainnetSettle: config.network === 'xrpl:0' });
-    return new XrplMerchant({ store, facilitator, config });
+    return new XrplMerchant({ store, facilitator, config, activationSale: env.XRPL_ACTIVATION_SALE !== '0' });
   })().catch(error => { ready = undefined; console.error('xrpl store init failed', error instanceof Error ? error.message : 'unknown'); return null; });
   return ready;
 }

@@ -7,7 +7,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { decode } from 'ripple-binary-codec';
 import { T54Facilitator, validateRequirement, xrplInvoiceField, type T54Network, type XrplPaymentPayload, type XrplRequirement } from './t54-facilitator.js';
 import { invoiceIdForCall, type XrplLedgerEvidence, type XrplPaymentBinding } from './xrpl-evidence.js';
-import { fetchVerifiedXrplPayment, payeeActivated } from './xrpl-ledger.js';
+import { baseReserveDrops, fetchVerifiedXrplPayment, payeeActivated } from './xrpl-ledger.js';
 import { XrplSettlementCoordinator } from './xrpl-settlement.js';
 import type { InvoiceRecord, PgXrplStore } from './xrpl-pg-store.js';
 
@@ -33,7 +33,7 @@ const MAX_HEADER = 16 * 1024;
 export interface MerchantResult { status: number; headers: Record<string, string>; body: unknown }
 export interface MerchantDeps {
   store: PgXrplStore; facilitator: T54Facilitator; ledgerFetch?: typeof fetch;
-  config?: MerchantConfig; now?: () => Date; sleep?: (ms: number) => Promise<void>; reconcileAttempts?: number; reconcileDelayMs?: number;
+  config?: MerchantConfig; activationSale?: boolean; now?: () => Date; sleep?: (ms: number) => Promise<void>; reconcileAttempts?: number; reconcileDelayMs?: number;
 }
 
 function stable(v: unknown): string {
@@ -91,32 +91,49 @@ export function evidenceReceipt(inv: InvoiceRecord, ev: XrplLedgerEvidence) {
 export class XrplMerchant {
   private readonly now: () => Date;
   private readonly config: MerchantConfig;
-  private payee: { ok: boolean; at: number } | null = null;
+  private payee: { state: { active: true } | { active: false; activationDrops: bigint | null }; at: number } | null = null;
   constructor(private readonly d: MerchantDeps) {
     this.now = d.now ?? (() => new Date());
     this.config = d.config ?? TESTNET_CONFIG;
     if (this.config.network !== d.facilitator.network) throw new Error('Merchant and facilitator networks differ');
   }
-  /** Refuse to sell while the payee is not an activated account: an underfunded payment would fail and burn the payer's fee. */
-  private async payeeReady(): Promise<boolean> {
+  /**
+   * A payment to a non-existent account must itself carry at least the base reserve, otherwise it fails with
+   * tecNO_DST_INSUF_XRP and burns the payer's fee. Until the payee exists, either sell one activation-priced
+   * payment (disclosed in the challenge) or refuse to sell.
+   */
+  private async payeeStatus(): Promise<{ active: true } | { active: false; activationDrops: bigint | null }> {
     const t = this.now().getTime();
-    if (this.payee && t - this.payee.at < (this.payee.ok ? 60_000 : 10_000)) return this.payee.ok;
-    let ok = false;
-    try { ok = await payeeActivated(this.config.payTo, this.config.network, this.d.ledgerFetch ?? fetch); } catch { ok = false; }
-    this.payee = { ok, at: t };
-    return ok;
+    if (this.payee && t - this.payee.at < (this.payee.state.active ? 60_000 : 10_000)) return this.payee.state;
+    let state: { active: true } | { active: false; activationDrops: bigint | null };
+    try {
+      if (await payeeActivated(this.config.payTo, this.config.network, this.d.ledgerFetch ?? fetch)) state = { active: true };
+      else {
+        let drops: bigint | null = null;
+        if (this.d.activationSale !== false) {
+          try { const reserve = await baseReserveDrops(this.config.network, this.d.ledgerFetch ?? fetch); const price = BigInt(this.config.amountDrops); drops = reserve > price ? reserve : price; } catch { drops = null; }
+        }
+        state = { active: false, activationDrops: drops };
+      }
+    } catch { state = { active: false, activationDrops: null }; }
+    this.payee = { state, at: t };
+    return state;
   }
 
   async challenge(origin: string, error?: string): Promise<MerchantResult> {
-    if (!(await this.payeeReady())) return this.fail(503, 'Payee account is not activated on ' + this.config.network + '; sales are paused so payers cannot lose fees');
+    const payee = await this.payeeStatus();
+    if (!payee.active && payee.activationDrops === null) return this.fail(503, 'Payee account is not activated on ' + this.config.network + '; sales are paused so payers cannot lose fees');
+    const activation = !payee.active;
+    const amount = payee.active ? this.config.amountDrops : payee.activationDrops!.toString();
     const sessionId = randomUUID(), callId = randomUUID();
     const invoiceId = invoiceIdForCall(sessionId, callId);
-    const requirement: XrplRequirement = { scheme: 'exact', network: this.config.network, asset: 'XRP', amount: this.config.amountDrops, payTo: this.config.payTo,
+    const requirement: XrplRequirement = { scheme: 'exact', network: this.config.network, asset: 'XRP', amount, payTo: this.config.payTo,
       maxTimeoutSeconds: CHALLENGE_TTL_SECONDS, extra: { invoiceId, sourceTag: this.config.sourceTag } };
     validateRequirement(requirement, this.config.network);
     await this.d.store.createInvoice({ invoiceId, sessionId, callId, requirement, expiresAt: new Date(this.now().getTime() + CHALLENGE_TTL_SECONDS * 1000) });
-    const body = { x402Version: 2, error: error ?? 'Payment required',
-      resource: { url: origin + '/api/xrpl/paid-resource', description: 'ALSP XRPL session evidence (' + (this.config.network === 'xrpl:0' ? 'mainnet' : 'testnet') + '): payment-bound, ledger-verified JSON record', mimeType: 'application/json' },
+    const note = activation ? ' NOTICE: one-time activation price. The payee account does not exist yet, so this single payment (' + amount + ' drops) must carry the XRP base reserve that creates it; the regular price is ' + this.config.amountDrops + ' drops.' : '';
+    const body = { x402Version: 2, error: (error ?? 'Payment required') + note,
+      resource: { url: origin + '/api/xrpl/paid-resource', description: 'ALSP XRPL session evidence (' + (this.config.network === 'xrpl:0' ? 'mainnet' : 'testnet') + '): payment-bound, ledger-verified JSON record' + note, mimeType: 'application/json' },
       accepts: [requirement] };
     return { status: 402, headers: { 'PAYMENT-REQUIRED': b64(body) }, body };
   }
@@ -136,6 +153,10 @@ export class XrplMerchant {
       return this.resolve(inv, tx);
     }
     if (inv.expiresAt.getTime() <= this.now().getTime()) return this.challenge(origin, 'Challenge expired; pay the new requirement');
+
+    // An activation-priced challenge must not be paid once the payee exists: the payer would overpay.
+    if (inv.requirement.amount !== this.config.amountDrops && (await this.payeeStatus()).active)
+      return this.challenge(origin, 'Price changed: the payee account is now active; pay the new requirement');
 
     const canonical: XrplPaymentPayload = { x402Version: 2, accepted: inv.requirement, payload: { signedTxBlob: payload.payload.signedTxBlob, invoiceId: inv.invoiceId } };
     try {

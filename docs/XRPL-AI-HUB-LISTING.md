@@ -45,3 +45,6 @@ Production defaults to **XRPL mainnet (`xrpl:0`)** at **10,000 drops (0.01 XRP)*
 Safety: the merchant issues no challenge (HTTP 503) while the payee account does not exist on the target network's validated ledger, because an underfunded payment to a missing account fails with `tecNO_DST_INSUF_XRP` and burns the payer's fee. The mainnet payee must hold at least the base reserve (1 XRP at time of writing) before sales start.
 
 Ledger RPC: mainnet `https://xrplcluster.com/` (override `XRPL_MAINNET_RPC_URL`, allowlisted: xrplcluster.com, s1/s2.ripple.com:51234).
+
+### Activation sale
+While the payee does not exist on the target network, the merchant issues challenges at the **activation price** (current base reserve, read from the ledger; at least the regular price) and says so in the 402 `error` and resource `description`. After the account exists, stale activation-priced challenges are refused and new ones use the regular price. Disable with `XRPL_ACTIVATION_SALE=0` (then the merchant returns 503 until the payee is funded). Do **not** submit the service to a registry while it is still advertising the activation price.

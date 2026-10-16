@@ -30,6 +30,7 @@ function world({ settleBehavior = 'ok', ledger = 'ok' } = {}) {
   };
   const ledgerFetch = async (_u, init) => {
     const reqBody = JSON.parse(init.body);
+    if (reqBody.method === 'server_info') return Response.json({ result: { info: { validated_ledger: { reserve_base_xrp: 1 } } } });
     if (reqBody.method === 'account_info') {
       return Response.json({ result: state.payee === false ? { status: 'error', error: 'actNotFound' } : { status: 'success', account_data: { Balance: '2000000' } } });
     }
@@ -185,15 +186,43 @@ test('mainnet: full paid flow at the mainnet price, bound to xrpl:0', { skip }, 
   await pool.end();
 });
 
-test('payee not activated: no challenge is issued and nothing can be paid', { skip }, async () => {
+test('payee not activated: one disclosed activation-priced sale, then the regular price', { skip }, async () => {
   const pool = await setup(); const w = world(); w.state.payee = false;
   const m = merchant(pool, w);
-  const r = await m.challenge(ORIGIN);
+  const ch = await m.challenge(ORIGIN);
+  assert.equal(ch.status, 402);
+  assert.equal(ch.body.accepts[0].amount, '1000000');
+  assert.match(ch.body.error, /one-time activation price/);
+  assert.match(ch.body.resource.description, /regular price is 1000 drops/);
+  // the payee becomes active: stale activation-priced challenges are refused, new ones use the regular price
+  const stale = await prepare(m, w);
+  w.state.payee = true;
+  const m2 = merchant(pool, w);
+  const refused = await m2.handle(ORIGIN, headerOf(stale.req, stale.blob));
+  assert.equal(refused.status, 402);
+  assert.match(refused.body.error, /Price changed/);
+  assert.equal(w.calls.settle, 0);
+  assert.equal((await m2.challenge(ORIGIN)).body.accepts[0].amount, '1000');
+  await pool.end();
+});
+
+test('payee not activated and activation sale disabled: sales are paused with 503', { skip }, async () => {
+  const pool = await setup(); const w = world(); w.state.payee = false;
+  const r = await merchant(pool, w, { activationSale: false }).challenge(ORIGIN);
   assert.equal(r.status, 503);
   assert.match(r.body.error, /not activated/);
   assert.equal((await pool.query('SELECT count(*)::int AS n FROM xrpl_invoices')).rows[0].n, 0);
-  w.state.payee = true; // cached negative result expires in 10s; a new merchant instance re-checks
-  assert.equal((await merchant(pool, w).challenge(ORIGIN)).status, 402);
+  await pool.end();
+});
+
+test('activation payment is accepted and settles at the activation price', { skip }, async () => {
+  const pool = await setup(); const w = world(); w.state.payee = false;
+  const m = merchant(pool, w);
+  const { req, blob } = await prepare(m, w);
+  assert.equal(req.amount, '1000000');
+  const r = await m.handle(ORIGIN, headerOf(req, blob));
+  assert.equal(r.status, 200);
+  assert.equal(r.body.payment.delivered.value, '1.000000');
   await pool.end();
 });
 
