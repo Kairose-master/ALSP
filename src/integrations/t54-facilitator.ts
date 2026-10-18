@@ -46,7 +46,7 @@ export function validateRequirement(r: XrplRequirement, expected: T54Network): v
 }
 export class T54Facilitator {
   readonly baseUrl: string;
-  constructor(readonly network: T54Network = 'xrpl:1', private readonly fetchImpl: typeof fetch = fetch) {
+  constructor(readonly network: T54Network = 'xrpl:1', private readonly fetchImpl: typeof fetch = fetch, private readonly options: { allowMainnetSettle?: boolean } = {}) {
     this.baseUrl = network === 'xrpl:1' ? T54_TESTNET : network === 'xrpl:0' ? T54_MAINNET : (() => { throw new Error('Unsupported network'); })();
   }
   private async post(path: '/verify' | '/settle', paymentPayload: XrplPaymentPayload, paymentRequirements: XrplRequirement): Promise<Record<string, unknown>> {
@@ -68,9 +68,10 @@ export class T54Facilitator {
   verify(payload: XrplPaymentPayload, requirement: XrplRequirement): Promise<Record<string, unknown>> {
     return this.post('/verify', payload, requirement);
   }
-  /** Never retry an ambiguous settlement automatically. Persist intent before calling. */
-  async settle(payload: XrplPaymentPayload, requirement: XrplRequirement, explicitTestnetOptIn: boolean): Promise<T54Settlement> {
-    if (this.network !== 'xrpl:1' || !explicitTestnetOptIn) throw new Error('Settlement disabled outside explicitly opted-in testnet');
+  /** Never retry an ambiguous settlement automatically. Persist intent before calling. Mainnet needs construction-time opt-in. */
+  async settle(payload: XrplPaymentPayload, requirement: XrplRequirement, explicitSettleOptIn: boolean): Promise<T54Settlement> {
+    if (!explicitSettleOptIn || (this.network !== 'xrpl:1' && !(this.network === 'xrpl:0' && this.options.allowMainnetSettle === true)))
+      throw new Error('Settlement disabled outside explicitly opted-in network');
     const result = await this.post('/settle', payload, requirement);
     if (typeof result.success !== 'boolean') throw new Error('Malformed settlement response');
     if (result.network !== undefined && result.network !== this.network) throw new Error('Settlement network mismatch');
