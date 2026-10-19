@@ -23,7 +23,7 @@ export function xrplChallenge(origin) {
 }
 export function xrplDirectoryMetadata(origin, live = false) {
   if (live) return {
-    name: 'ALSP XRPL session evidence (testnet)',
+    name: 'ALSP XRPL session evidence',
     description: 'Pay in XRP (x402 exact via t54) and receive a ledger-verified, payment-bound ALSP session evidence record as JSON.',
     resources: [{ url: origin + XRPL_RESOURCE, name: 'ALSP XRPL session evidence', description: 'Payment-bound, ledger-verified JSON evidence record (price set in the 402 challenge).' }]
   };
