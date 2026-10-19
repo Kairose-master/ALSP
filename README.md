@@ -83,4 +83,10 @@ The package root `dist/index.js` remains a backward-compatible entry point for t
 
 Bilingual whitepaper: https://handsel.gitbook.io/alsp-whitepaper/
 
-No repository-wide software license has been selected. Do not infer permission to deploy or redistribute from visibility alone.
+## License
+
+Copyright 2026 Kairose-master. Licensed under the [Apache License, Version 2.0](LICENSE); see [NOTICE](NOTICE).
+
+Exception: `contracts/license/experimental/ALSPRegistry.sol` keeps its own `SPDX-License-Identifier: MIT` header. It is an unaudited legacy sketch outside Core requirements.
+
+This software is provided "AS IS" without warranties of any kind (see the license). The protocol is experimental; the validation boundaries above describe what has and has not been verified. Nothing in this repository is financial advice, and operating a payment service with real funds is your own responsibility.
